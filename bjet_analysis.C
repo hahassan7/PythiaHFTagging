@@ -3,7 +3,10 @@
 
 void bjet_analysis()
 {
-    // Initialize features we want to store
+    std::cout << "Starting analysis..." << std::endl;
+
+    // Initialize features
+    std::cout << "Initializing features..." << std::endl;
     std::vector<std::string> features = {
         "JetpT", "JetEta", "JetPhi", "JetMass", "JetFlavor",
         "TrackpT", "TrackEta", "SignedIP2D", "SignedIP3D",
@@ -45,17 +48,35 @@ void bjet_analysis()
     TH1F *hNSVperJet_b = new TH1F("hNSVperJet_b", "Number of SV per Jet (b-jets);N_{SV};Counts", 10, 0, 10);
     TH1F *hNSVperJet_c = new TH1F("hNSVperJet_c", "Number of SV per Jet (c-jets);N_{SV};Counts", 10, 0, 10);
 
-    // Initialize Pythia
+    // Add this with other histogram declarations
+    TH1F *hPrimaryVertexZ = new TH1F("hPrimaryVertexZ", "Primary Vertex Z Position;z (cm);Counts", 100, -10, 10);
+
+    // Initialize Pythia with more detailed error checking
+    std::cout << "Initializing Pythia..." << std::endl;
     Pythia8::Pythia pythia;
+    
+    // Basic settings
     pythia.readString("Beams:eCM = 13000.");
+    std::cout << "Set beam energy" << std::endl;
+    
     pythia.readString("Beams:allowVertexSpread = on");
-    pythia.readString("Beams:sigmaVertexX = 10");   // Back to mm (= 1 cm)
-    pythia.readString("Beams:sigmaVertexY = 10");   // Back to mm (= 1 cm)
-    pythia.readString("Beams:sigmaVertexZ = 50");   // Back to mm (= 5 cm)
+    std::cout << "Enabled vertex spread" << std::endl;
+    
+    // More reasonable vertex spread values (in mm)
+    pythia.readString("Beams:sigmaVertexX = 0.015");  // 15 μm
+    pythia.readString("Beams:sigmaVertexY = 0.015");  // 15 μm
+    pythia.readString("Beams:sigmaVertexZ = 0.050");  // 50 μm
+    std::cout << "Set vertex spread parameters" << std::endl;
+    
     pythia.readString("HardQCD:all = on");          // Turn on hard QCD processes
     pythia.readString("PhaseSpace:pTHatMin = 20."); // Min pT for hard interaction
+    std::cout << "Set physics process parameters" << std::endl;
 
-    pythia.init();
+    if (!pythia.init()) {
+        std::cout << "ERROR: Pythia initialization failed!" << std::endl;
+        return;
+    }
+    std::cout << "Pythia initialized successfully" << std::endl;
 
     // Initialize FastJet
     double R = 0.4; // jet radius parameter
@@ -70,7 +91,7 @@ void bjet_analysis()
     long totalJets = 0;
     long totalEvents = 0;
     constexpr int maxConst = 13;
-    
+
     JTreeHFFeatures<maxConst> treeWriter("bjet_features.root", features);
 
     // Create random number generator
@@ -80,108 +101,82 @@ void bjet_analysis()
     const double spatialResolution = 0.005; // 50 microns
 
     // Initialize histograms
-    DCASmearing::initializeHistograms();
+    DCASmearing dcaSmearer;
+    dcaSmearer.initializeHistograms();
 
     for (int iEvent = 0; iEvent < nEvents; ++iEvent)
     {
+        std::cout << "\n=== Processing event " << iEvent << " ===" << std::endl;
+        
         if (!pythia.next())
+        {
+            std::cout << "Pythia event generation failed" << std::endl;
             continue;
+        }
 
-        // Collect tracks for primary vertex finding
-        std::vector<TrackWithWeight> primaryTracks;
+        // Collect tracks
+        std::cout << "Collecting tracks..." << std::endl;
+        std::vector<Track> primaryTracks;
+        std::vector<TParticle> mcparticles;
+        
+        // Process particles
+        std::cout << "Processing particles..." << std::endl;
+        std::vector<fastjet::PseudoJet> particles;
+        std::vector<Track> allTracks;
+        std::vector<Track> truthTracks;
 
-        std::vector<fastjet::PseudoJet> mcparticles;
-
-        // Loop over all tracks in the event
         for (int i = 0; i < pythia.event.size(); ++i)
         {
             const Pythia8::Particle &part = pythia.event[i];
+            
+            std::cout << "Processing particle " << i 
+                      << " (ID: " << part.id() 
+                      << ", pT: " << part.pT()
+                      << ", eta: " << part.eta()
+                      << ", zProd: " << part.zProd() << " mm)" << std::endl;
 
             // Parton Definition
             if ((part.id() == 5 || part.id() == -5))
             {
-                mcparticles.push_back(fastjet::PseudoJet(part.px(), part.py(), part.pz(), part.e()));
+                mcparticles.push_back(convertToTParticle(part));
             }
             else if ((part.id() == 4 || part.id() == -4))
             {
-                mcparticles.push_back(fastjet::PseudoJet(part.px(), part.py(), part.pz(), part.e()));
+                mcparticles.push_back(convertToTParticle(part));
             }
-
-            // Select only charged final state particles
-            if (!part.isFinal() || part.charge() == 0)
-                continue;
-
-            // Get production vertex coordinates
-            double xProd = part.xProd() * 0.1; // Convert mm to cm
-            double yProd = part.yProd() * 0.1;
-            double zProd = part.zProd() * 0.1;
-
-            // Add detector resolution smearing
-            double xSmeared = random.Gaus(xProd, spatialResolution);
-            double ySmeared = random.Gaus(yProd, spatialResolution);
-            double zSmeared = random.Gaus(zProd, spatialResolution);
-
-            // Check if particle comes from hadron decay
-            bool isFromHadronDecay = false;
-            const Pythia8::Particle &mother = pythia.event[part.mother1()];
-            if (mother.isHadron() && mother.tau() > 1e-12)
-            {
-                isFromHadronDecay = true;
-            }
-            if (isFromHadronDecay)
-                continue;
-
-            // Create track parameters with smeared positions
-            TVector3 pos(xSmeared, ySmeared, zSmeared);
-            TVector3 truePos(xProd, yProd, zProd);
-            TVector3 mom(part.px(), part.py(), part.pz());
-
-            // Add to collection with appropriate uncertainty
-            primaryTracks.push_back(VertexFinder::createTrackWithWeight(pos, mom, spatialResolution));
-        }
-
-        // Add check for minimum number of tracks
-        if (primaryTracks.size() < 3)
-        {
-            std::cout << "Warning: Too few tracks for vertex finding" << std::endl;
-            continue;
-        }
-
-        // Find primary vertex
-        TVector3 primaryVertex = VertexFinder::findPrimaryVertex(primaryTracks,
-                                                                 0.001, // 10 micron convergence
-                                                                 50,    // max iterations
-                                                                 1.0,   // temperature
-                                                                 6.0);  // tighter chi2 cut
-
-        // Add sanity check on found vertex position
-        if (std::abs(primaryVertex.Z()) > 10.0 ||
-            std::abs(primaryVertex.X()) > 2.0 ||
-            std::abs(primaryVertex.Y()) > 2.0)
-        {
-            std::cout << "Warning: Found vertex position outside expected range" << std::endl;
-            continue;
-        }
-
-        // Collect final state particles and apply detector simulation
-        std::vector<fastjet::PseudoJet> particles;
-        std::vector<DetectorSimulation::SmearTrackParams> allTracks;
-
-        for (int i = 0; i < pythia.event.size(); ++i)
-        {
-            const Pythia8::Particle &part = pythia.event[i];
 
             // Select only final state charged particles
             if (!part.isFinal() || part.charge() == 0)
                 continue;
+
+            // After detector simulation
+            std::cout << "Applying detector simulation..." << std::endl;
+            auto trackParams = detector.smearTrack(part);
+            std::cout << "Smeared z position: " << trackParams.pos.Z() << " cm" << std::endl;
+
+            // Check mother
+            const Pythia8::Particle &mother = pythia.event[part.mother1()];
+            std::cout << "Mother particle ID: " << mother.id() 
+                      << ", isHadron: " << mother.isHadron()
+                      << ", tau: " << mother.tau() << std::endl;
+
+            // Check if particle comes from hadron decay
+            if (!(mother.isHadron() && mother.tau() > 0))
+            {
+                primaryTracks.push_back(trackParams);
+            }
+
             if (abs(part.eta()) > 0.9)
                 continue; // detector acceptance
             if (part.pT() < 0.15)
                 continue; // pT cut
 
-            // Apply detector simulation
-            auto trackParams = detector.smearTrack(part, primaryVertex);
             allTracks.push_back(trackParams);
+            truthTracks.push_back(Track(TVector3(part.xProd() * 0.1, part.yProd() * 0.1, part.zProd() * 0.1),
+                                        TVector3(part.px(), part.py(), part.pz()),
+                                        std::copysign(std::sqrt(part.xProd() * part.xProd() + part.yProd() * part.yProd()), part.yProd()) * 0.1,
+                                        part.zProd() * 0.1,
+                                        part.charge()));
 
             // Add to jet finding
             particles.push_back(fastjet::PseudoJet(trackParams.mom.X(),
@@ -189,6 +184,32 @@ void bjet_analysis()
                                                    trackParams.mom.Z(),
                                                    trackParams.mom.Mag()));
             particles.back().set_user_index(allTracks.size() - 1);
+        }
+
+        // Find primary vertex
+        std::cout << "Finding primary vertex..." << std::endl;
+        if (primaryTracks.size() < 3)
+        {
+            std::cout << "Too few tracks for vertex finding: " << primaryTracks.size() << std::endl;
+            continue;
+        }
+
+        TVector3 primaryVertex = VertexFinder::findPrimaryVertex(primaryTracks,
+                                                                 0.001, // 10 micron convergence
+                                                                 50,    // max iterations
+                                                                 1.0,   // temperature
+                                                                 6.0);  // tighter chi2 cut
+
+        // Fill primary vertex Z position
+        hPrimaryVertexZ->Fill(primaryVertex.Z());
+
+        // Vertex position check
+        if (std::abs(primaryVertex.Z()) > 10.0 ||
+            std::abs(primaryVertex.X()) > 2.0 ||
+            std::abs(primaryVertex.Y()) > 2.0)
+        {
+            std::cout << "WARNING: Vertex position outside range!" << std::endl;
+            continue;
         }
 
         // Jet finding
@@ -223,7 +244,7 @@ void bjet_analysis()
             }
 
             // Collect tracks associated with this jet
-            std::vector<DetectorSimulation::SmearTrackParams> jetTracks;
+            std::vector<Track> jetTracks;
             for (const auto &constituent : constituents)
             {
                 int trackIndex = constituent.user_index();
@@ -287,8 +308,8 @@ void bjet_analysis()
             {
                 treeWriter.getData().mTrackpT[i] = jetTracks[i].mom.Pt();
                 treeWriter.getData().mTrackEta[i] = jetTracks[i].mom.Eta();
-                treeWriter.getData().mSignedIP2D[i] = calculateSignedIP2D(jetTracks[i], primaryVertex);
-                treeWriter.getData().mSignedIP3D[i] = calculateSignedIP3D(jetTracks[i], primaryVertex);
+                // treeWriter.getData().mSignedIP2D[i] = calculateSignedIP2D(jetTracks[i], primaryVertex);
+                // treeWriter.getData().mSignedIP3D[i] = calculateSignedIP3D(jetTracks[i], primaryVertex);
             }
 
             // Fill SV features
@@ -315,20 +336,13 @@ void bjet_analysis()
         }
 
         // Apply smearing to all tracks
-        for (const auto &track : allTracks)
+        for (int i = 0; i < allTracks.size(); i++)
         {
-            // Create truth DCA parameters
-            DCASmearing::DCAParams truthDCA;
-            // Calculate signed DCA values (can be positive or negative)
-            truthDCA.dcaXY = std::copysign(std::sqrt(track.pos.X() * track.pos.X() + track.pos.Y() * track.pos.Y()), track.pos.Y());
-            truthDCA.dcaZ = track.pos.Z();
-
-            // Apply smearing
-            DCASmearing::DCAParams smearedDCA = DCASmearing::smearDCA(track.mom, truthDCA, DCASmearing::SmearingMethod::PT_DEPENDENT);
-
             // Fill histograms
-            DCASmearing::fillHistograms(track.mom, truthDCA, smearedDCA);
+            dcaSmearer.fillHistograms(truthTracks[i], allTracks[i]);
         }
+
+        std::cout << "Event " << iEvent << " processed successfully" << std::endl;
     }
 
     // Write and close

@@ -1,5 +1,5 @@
 #ifdef __CLING__
-R__LOAD_LIBRARY(libpythia8.so)
+R__LOAD_LIBRARY(libpythia8.dylib)
 R__ADD_INCLUDE_PATH($PYTHIA_ROOT / include)
 #endif
 
@@ -15,6 +15,7 @@ R__ADD_INCLUDE_PATH($PYTHIA_ROOT / include)
 #include "TLorentzVector.h"
 #include "TMatrixD.h"
 #include "TProfile.h"
+#include "TParticle.h"
 #include <vector>
 #include <map>
 #include <string>
@@ -35,19 +36,20 @@ R__ADD_INCLUDE_PATH($FASTJET_ROOT / include)
 #include "fastjet/GhostedAreaSpec.hh" // for area support
 #endif                                // __FJCORE__
 
-// Move deltaR function declaration to the top, before any usage
-double deltaR(double eta1, double phi1, double eta2, double phi2)
-{
-    double deta = eta1 - eta2;
-    double dphi = TVector2::Phi_mpi_pi(phi1 - phi2);
-    return sqrt(deta * deta + dphi * dphi);
-}
-
 template <typename T, typename U>
 float deltaR(T const &A, U const &B)
 {
-    float dPhi = TVector2::Phi_mpi_pi(A.phi() - B.phi());
-    float dEta = A.eta() - B.eta();
+    double dPhi, dEta;
+    if constexpr (std::is_same<U, TVector3>::value || std::is_same<U, TParticle>::value)
+    {
+        dPhi = TVector2::Phi_mpi_pi(A.phi() - B.Phi());
+        dEta = A.eta() - B.Eta();
+    }
+    else
+    {
+        dPhi = TVector2::Phi_mpi_pi(A.phi() - B.phi());
+        dEta = A.eta() - B.eta();
+    }
 
     return std::sqrt(dEta * dEta + dPhi * dPhi);
 }
@@ -62,13 +64,26 @@ enum JetTaggingSpecies
     gluon = 5
 };
 
+struct Track
+{
+    TVector3 pos;
+    TVector3 mom;
+    double dcaXY;
+    double dcaZ;
+    double charge;
+
+    Track(const TVector3 &p = TVector3(), const TVector3 &m = TVector3(),
+          double dxy = 0, double dz = 0, double q = 0)
+        : pos(p), mom(m), dcaXY(dxy), dcaZ(dz), charge(q) {}
+};
+
 template <typename AnyJet, typename AllMCParticles>
 int16_t getJetFlavor(AnyJet const &jet, AllMCParticles const &mcparticles, float maxDistance = 0.4)
 {
     bool charmQuark = false;
     for (auto const &mcpart : mcparticles)
     {
-        int pdgcode = mcpart.pdgCode();
+        int pdgcode = mcpart.GetPdgCode();
         if (std::abs(pdgcode) == 21 || (std::abs(pdgcode) >= 1 && std::abs(pdgcode) <= 5))
         {
             double dR = deltaR(jet, mcpart);
@@ -127,48 +142,97 @@ private:
     TRandom3 *rand;
 
     // Track parameter resolutions
-    const double dcaXYParam[2] = {4.0, 20.0};        // [µm] (offset, pt_slope)
-    const double dcaZParam[2] = {4.0, 20.0};         // [µm]
+    const double dcaXYParam[2] = {4.0e-4, 20.0e-4};  // [µm] (offset, pt_slope)
+    const double dcaZParam[2] = {4.0e-4, 20.0e-4};   // [µm]
     const double ptParam[3] = {0.005, 0.01, 0.0003}; // pt resolution
     const double phiRes = 0.001;                     // [rad]
     const double thetaRes = 0.001;                   // [rad]
 
     // Vertex resolutions
-    const double vtxXYRes = 10.0; // [µm]
-    const double vtxZRes = 15.0;  // [µm]
+    const double vtxXYRes = 12.0; // [µm] in pp
+    const double vtxZRes = 15.0;  // [µm] in pp
 
 public:
     DetectorSimulation() : rand(new TRandom3(0)) {}
 
-    struct SmearTrackParams
+    // Different smearing methods
+    enum class SmearingMethod
     {
-        TVector3 pos;  // position at DCA
-        TVector3 mom;  // momentum at DCA
-        double dca_xy; // DCA in xy plane
-        double dca_z;  // DCA in z
-        double charge; // particle charge
+        GAUSSIAN,
+        PT_DEPENDENT,
+        NONE // For truth values
     };
 
+    void smearDCA(const Pythia8::Particle &parttobesmeared, Track &smearedTrack, SmearingMethod method = SmearingMethod::PT_DEPENDENT)
+    {
+        double xProd = parttobesmeared.xProd() * 0.1;
+        double yProd = parttobesmeared.yProd() * 0.1;
+        double zProd = parttobesmeared.zProd() * 0.1;
+        double pT = parttobesmeared.pT();
+        double eta = parttobesmeared.eta();
+
+        switch (method)
+        {
+        case SmearingMethod::PT_DEPENDENT:
+        {
+
+            if (pT < 0.1)
+            {
+                pT = 0.1;
+            }
+
+            std::cout << "pT: " << std::fixed << std::setprecision(10) << pT << " eta: " << std::fixed << std::setprecision(10) << eta << std::endl;
+
+            // Calculate resolutions
+            double sigmaXY = std::sqrt(dcaXYParam[0] * dcaXYParam[0] + (dcaXYParam[1] * dcaXYParam[1]) / (pT * pT));
+            double sigmaZ = std::sqrt(dcaZParam[0] * dcaZParam[0] + (dcaZParam[1] * dcaZParam[1]) / (pT * pT));
+
+            std::cout << "sigmaXY: " << std::fixed << std::setprecision(10) << sigmaXY << " sigmaZ: " << std::fixed << std::setprecision(10) << sigmaZ << std::endl;
+
+            // Add eta dependence (resolution degrades at higher eta)
+            double etaFactor = 1.0 + 0.1 * std::abs(eta); // Approximate effect
+            sigmaXY *= etaFactor;
+            sigmaZ *= etaFactor;
+
+            // Apply smearing
+            smearedTrack.dcaXY = rand->Gaus(std::copysign(std::sqrt(xProd * xProd + yProd * yProd), yProd), sigmaXY);
+            smearedTrack.dcaZ = rand->Gaus(zProd, sigmaZ);
+            break;
+        }
+
+        case SmearingMethod::GAUSSIAN:
+        {
+            // Fixed resolution based on average ITS2 performance
+            const double sigmaXY = 0.0010; // 10 μm -> cm
+            const double sigmaZ = 0.0010;  // 10 μm -> cm
+
+            smearedTrack.dcaXY = rand->Gaus(std::copysign(std::sqrt(xProd * xProd + yProd * yProd), yProd), sigmaXY);
+            smearedTrack.dcaZ = rand->Gaus(zProd, sigmaZ);
+            break;
+        }
+
+        case SmearingMethod::NONE:
+        default:
+            break;
+        }
+    }
+
     // Function to smear pT based on ALICE ITS resolution
-    // detector: "ITS2" or "ITS3"
     double smear_pT(double pT)
     {
         // Compute momentum resolution
         double sigma_pT_over_pT = std::sqrt(ptParam[0] * ptParam[0] + (ptParam[1] / pT) * (ptParam[1] / pT) + (ptParam[2] * pT) * (ptParam[2] * pT));
 
-        // Gaussian random generator
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::normal_distribution<double> gauss(0.0, sigma_pT_over_pT);
-
         // Apply smearing
-        double smeared_pT = pT * (1.0 + gauss(gen));
+        double smeared_pT = rand->Gaus(pT, sigma_pT_over_pT);
         return smeared_pT;
     }
 
-    SmearTrackParams smearTrack(const Pythia8::Particle &part, const TVector3 &primaryVtx)
+    Track smearTrack(const Pythia8::Particle &part)
     {
-        SmearTrackParams params;
+        Track params = Track();
+
+        smearDCA(part, params);
 
         // Smear momentum
         double pt = smear_pT(part.pT());
@@ -178,39 +242,20 @@ public:
         params.mom.SetPtThetaPhi(pt, theta, phi);
         params.charge = part.charge();
 
-        // Production vertex relative to primary vertex
-        TVector3 prodVtx(part.xProd() * 0.1, part.yProd() * 0.1, part.zProd() * 0.1);
-        prodVtx -= primaryVtx;
-
-        // Smear DCA
-        double sigma_xy = sqrt(dcaXYParam[0] * dcaXYParam[0] +
-                               dcaXYParam[1] * dcaXYParam[1] / (pt * pt));
-        double sigma_z = sqrt(dcaZParam[0] * dcaZParam[0] +
-                              dcaZParam[1] * dcaZParam[1] / (pt * pt));
-
-        // Add eta dependence (resolution degrades at higher eta)
-        double etaFactor = 1.0 + 0.1 * std::abs(params.mom.Eta()); // Approximate effect
-        sigma_xy *= etaFactor;
-        sigma_z *= etaFactor;
-
-        params.dca_xy = rand->Gaus(0, sigma_xy * 1e-4); // convert to cm
-        params.dca_z = rand->Gaus(0, sigma_z * 1e-4);
-
         // Calculate position at DCA
-        TVector3 dca_pos = prodVtx;
-        dca_pos.SetXYZ(dca_pos.X() + params.dca_xy * sin(phi),
-                       dca_pos.Y() - params.dca_xy * cos(phi),
-                       dca_pos.Z() + params.dca_z);
+        // TODO: Check if this is correct
+        params.pos = TVector3(std::abs(params.dcaXY) * sin(phi),
+                              std::abs(params.dcaXY) * cos(phi),
+                              params.dcaZ);
 
-        params.pos = dca_pos;
         return params;
     }
 
-    TVector3 smearPrimaryVertex()
+    void smearPrimaryVertex(TVector3 &primaryVtx)
     {
-        return TVector3(rand->Gaus(0, vtxXYRes * 1e-4),
-                        rand->Gaus(0, vtxXYRes * 1e-4),
-                        rand->Gaus(0, vtxZRes * 1e-4));
+        primaryVtx.SetX(rand->Gaus(primaryVtx.X(), vtxXYRes * 1e-4));
+        primaryVtx.SetY(rand->Gaus(primaryVtx.Y(), vtxXYRes * 1e-4));
+        primaryVtx.SetZ(rand->Gaus(primaryVtx.Z(), vtxZRes * 1e-4));
     }
 
     ~DetectorSimulation()
@@ -248,12 +293,12 @@ public:
     };
 
     // Modified to return vector of SVs
-    std::vector<SecVtxInfo> findSecondaryVertices(const std::vector<DetectorSimulation::SmearTrackParams> &inputTracks)
+    std::vector<SecVtxInfo> findSecondaryVertices(const std::vector<Track> &inputTracks)
     {
         std::vector<SecVtxInfo> vertices;
 
         // First apply track cuts
-        std::vector<DetectorSimulation::SmearTrackParams> goodTracks;
+        std::vector<Track> goodTracks;
         for (const auto &track : inputTracks)
         {
             if (passesTrackCuts(track))
@@ -273,7 +318,7 @@ public:
             {
                 for (size_t k = j + 1; k < goodTracks.size(); ++k)
                 {
-                    std::vector<DetectorSimulation::SmearTrackParams> trackTriplet = {
+                    std::vector<Track> trackTriplet = {
                         goodTracks[i], goodTracks[j], goodTracks[k]};
 
                     SecVtxInfo vtxInfo = findSingleSecondaryVertex(trackTriplet);
@@ -314,7 +359,7 @@ public:
 
 private:
     // Renamed original function to handle single vertex finding
-    SecVtxInfo findSingleSecondaryVertex(const std::vector<DetectorSimulation::SmearTrackParams> &tracks)
+    SecVtxInfo findSingleSecondaryVertex(const std::vector<Track> &tracks)
     {
         SecVtxInfo vtxInfo;
         if (tracks.size() < 2)
@@ -401,7 +446,7 @@ private:
         return vtxInfo;
     }
 
-    double calcVertexChi2(const std::vector<DetectorSimulation::SmearTrackParams> &tracks,
+    double calcVertexChi2(const std::vector<Track> &tracks,
                           const TVector3 &vtxPos)
     {
         double chi2 = 0;
@@ -429,7 +474,7 @@ private:
         return true;
     }
 
-    bool passesTrackCuts(const DetectorSimulation::SmearTrackParams &track)
+    bool passesTrackCuts(const Track &track)
     {
         // Check track pT
         if (track.mom.Pt() <= minTrackPt)
@@ -465,9 +510,7 @@ struct SVCalculations
 
     static double calculateDeltaRToJet(const TVector3 &svPosition, const fastjet::PseudoJet &jet)
     {
-        double svEta = svPosition.Eta();
-        double svPhi = svPosition.Phi();
-        return deltaR(svEta, svPhi, jet.eta(), jet.phi());
+        return deltaR(jet, svPosition);
     }
 
     static double calculateSVfE(double svEnergy, double jetEnergy)
@@ -506,19 +549,10 @@ struct SVCalculations
     }
 };
 
-// Add to your existing structs/classes
-struct TrackWithWeight
-{
-    TVector3 position;
-    TVector3 momentum;
-    TMatrixD covMatrix; // 3x3 covariance matrix for position
-    double weight;      // Track weight for adaptive fitting
-};
-
 class VertexFinder
 {
 public:
-    static TVector3 findPrimaryVertex(const std::vector<TrackWithWeight> &tracks,
+    static TVector3 findPrimaryVertex(const std::vector<Track> &tracks,
                                       double convergenceDist = 0.01, // in cm
                                       int maxIterations = 100,
                                       double temperatureScale = 2.0, // Controls how fast weights change
@@ -533,7 +567,7 @@ public:
         TVector3 vtxPos(0., 0., 0.);
         for (const auto &track : tracks)
         {
-            vtxPos += track.position;
+            vtxPos += track.pos;
         }
         vtxPos *= (1.0 / tracks.size());
 
@@ -552,7 +586,7 @@ public:
             for (auto &track : tracks)
             {
                 // Calculate chi2 distance to current vertex estimate
-                TVector3 diff = track.position - vtxPos;
+                TVector3 diff = track.pos - vtxPos;
 
                 // Simplified chi2 calculation (you might want to use full covariance matrix)
                 double chi2 = diff.Mag2(); // Simplified - assumes spherical errors
@@ -569,7 +603,7 @@ public:
                 }
 
                 // Update sums
-                newPos += track.position * weight;
+                newPos += track.pos * weight;
                 weightSum += weight;
             }
 
@@ -598,104 +632,11 @@ public:
 
         return vtxPos;
     }
-
-    // Helper function to create TrackWithWeight from track parameters
-    static TrackWithWeight createTrackWithWeight(const TVector3 &pos, const TVector3 &mom,
-                                                 double posUncertainty = 0.01)
-    { // 100 microns default
-        TrackWithWeight track;
-        track.position = pos;
-        track.momentum = mom;
-        track.weight = 1.0;
-
-        // Initialize covariance matrix (simplified)
-        track.covMatrix.ResizeTo(3, 3);
-        track.covMatrix.Zero();
-        track.covMatrix(0, 0) = posUncertainty * posUncertainty;
-        track.covMatrix(1, 1) = posUncertainty * posUncertainty;
-        track.covMatrix(2, 2) = posUncertainty * posUncertainty;
-
-        return track;
-    }
 };
 
 class DCASmearing
 {
 public:
-    struct DCAParams
-    {
-        double dcaXY;
-        double dcaZ;
-    };
-
-    // Different smearing methods
-    enum class SmearingMethod
-    {
-        GAUSSIAN,
-        PT_DEPENDENT,
-        NONE // For truth values
-    };
-
-    static DCAParams smearDCA(const TVector3 &trackMom, const DCAParams &truthDCA,
-                              SmearingMethod method = SmearingMethod::PT_DEPENDENT)
-    {
-
-        static TRandom3 random(0);
-        DCAParams smearedDCA = truthDCA;
-
-        switch (method)
-        {
-        case SmearingMethod::PT_DEPENDENT:
-        {
-            double pT = trackMom.Pt();
-            double eta = trackMom.Eta();
-
-            // ALICE ITS2 parameterization
-            // Values from ALICE ITS2 TDR and performance papers
-            // Resolution in micrometers, convert to cm
-
-            // For DCAxy (rφ): σ = sqrt(a² + (b/pT)²)
-            const double a_xy = 0.0004; // 4 μm -> cm
-            const double b_xy = 0.0020; // 20 μm*GeV/c -> cm*GeV/c
-
-            // For DCAz: σ = sqrt(a² + (b/pT)²)
-            const double a_z = 0.0004; // 4 μm -> cm
-            const double b_z = 0.0020; // 20 μm*GeV/c -> cm*GeV/c
-
-            // Calculate resolutions
-            double sigmaXY = std::sqrt(a_xy * a_xy + (b_xy * b_xy) / (pT * pT));
-            double sigmaZ = std::sqrt(a_z * a_z + (b_z * b_z) / (pT * pT));
-
-            // Add eta dependence (resolution degrades at higher eta)
-            double etaFactor = 1.0 + 0.1 * std::abs(eta); // Approximate effect
-            sigmaXY *= etaFactor;
-            sigmaZ *= etaFactor;
-
-            // Apply smearing
-            smearedDCA.dcaXY = random.Gaus(truthDCA.dcaXY, sigmaXY);
-            smearedDCA.dcaZ = random.Gaus(truthDCA.dcaZ, sigmaZ);
-            break;
-        }
-
-        case SmearingMethod::GAUSSIAN:
-        {
-            // Fixed resolution based on average ITS2 performance
-            const double sigmaXY = 0.0010; // 10 μm -> cm
-            const double sigmaZ = 0.0010;  // 10 μm -> cm
-
-            smearedDCA.dcaXY = random.Gaus(truthDCA.dcaXY, sigmaXY);
-            smearedDCA.dcaZ = random.Gaus(truthDCA.dcaZ, sigmaZ);
-            break;
-        }
-
-        case SmearingMethod::NONE:
-        default:
-            break;
-        }
-
-        return smearedDCA;
-    }
-
     // Update histogram ranges to match ALICE scales
     static void initializeHistograms()
     {
@@ -736,32 +677,31 @@ public:
                                 100, -2.5, 2.5, 200, -1.0, 1.0);
     }
 
-    static void fillHistograms(const TVector3 &trackMom, const DCAParams &truthDCA,
-                               const DCAParams &smearedDCA)
+    static void fillHistograms(const Track &truthPart, const Track &smearedPart)
     {
-        double pT = trackMom.Pt();
-        double eta = trackMom.Eta();
+        double pT = truthPart.mom.Pt();
+        double eta = truthPart.mom.Eta();
 
         // Fill DCA distributions
-        hDCAxy_Truth->Fill(truthDCA.dcaXY);
-        hDCAxy_Smeared->Fill(smearedDCA.dcaXY);
-        hDCAxy_Diff->Fill(smearedDCA.dcaXY - truthDCA.dcaXY);
+        hDCAxy_Truth->Fill(truthPart.dcaXY);
+        hDCAxy_Smeared->Fill(smearedPart.dcaXY);
+        hDCAxy_Diff->Fill(smearedPart.dcaXY - truthPart.dcaXY);
 
-        hDCAz_Truth->Fill(truthDCA.dcaZ);
-        hDCAz_Smeared->Fill(smearedDCA.dcaZ);
-        hDCAz_Diff->Fill(smearedDCA.dcaZ - truthDCA.dcaZ);
+        hDCAz_Truth->Fill(truthPart.dcaZ);
+        hDCAz_Smeared->Fill(smearedPart.dcaZ);
+        hDCAz_Diff->Fill(smearedPart.dcaZ - truthPart.dcaZ);
 
         // Fill pT-dependent histograms
-        hDCAxy_vs_pT->Fill(pT, smearedDCA.dcaXY);
-        hDCAz_vs_pT->Fill(pT, smearedDCA.dcaZ);
+        hDCAxy_vs_pT->Fill(pT, smearedPart.dcaXY);
+        hDCAz_vs_pT->Fill(pT, smearedPart.dcaZ);
 
         // Fill resolution profiles
-        hResolutionXY_vs_pT->Fill(pT, std::abs(smearedDCA.dcaXY - truthDCA.dcaXY));
-        hResolutionZ_vs_pT->Fill(pT, std::abs(smearedDCA.dcaZ - truthDCA.dcaZ));
+        hResolutionXY_vs_pT->Fill(pT, std::abs(smearedPart.dcaXY - truthPart.dcaXY));
+        hResolutionZ_vs_pT->Fill(pT, std::abs(smearedPart.dcaZ - truthPart.dcaZ));
 
         // Fill eta-dependent histograms
-        hDCAxy_vs_eta->Fill(eta, smearedDCA.dcaXY);
-        hDCAz_vs_eta->Fill(eta, smearedDCA.dcaZ);
+        hDCAxy_vs_eta->Fill(eta, smearedPart.dcaXY);
+        hDCAz_vs_eta->Fill(eta, smearedPart.dcaZ);
     }
 
 private:
@@ -794,3 +734,17 @@ TProfile *DCASmearing::hResolutionXY_vs_pT = nullptr;
 TProfile *DCASmearing::hResolutionZ_vs_pT = nullptr;
 TH2F *DCASmearing::hDCAxy_vs_eta = nullptr;
 TH2F *DCASmearing::hDCAz_vs_eta = nullptr;
+
+TParticle convertToTParticle(const Pythia8::Particle &part)
+{
+    return TParticle(
+        part.id(),                                             // pdg code
+        part.status(),                                         // status
+        part.mother1(),                                        // mother1
+        part.mother2(),                                        // mother2
+        part.daughter1(),                                      // daughter1
+        part.daughter2(),                                      // daughter2
+        part.px(), part.py(), part.pz(), part.e(),             // momentum
+        part.xProd(), part.yProd(), part.zProd(), part.tProd() // production vertex
+    );
+}

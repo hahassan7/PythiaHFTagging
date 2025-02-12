@@ -1,12 +1,38 @@
 #include "TaggingUtilities.h"
 #include "JTreeHFFeatures.h"
 
-void bjet_analysis()
+void bjet_analysis(int nEvents = 10000, DebugLevel debugLevel = DebugLevel::INFO)
 {
-    std::cout << "Starting analysis..." << std::endl;
+    auto logLocal = [debugLevel](DebugLevel level, const std::string& message) {
+        log(debugLevel, level, message);
+    };
+
+    logLocal(DebugLevel::INFO, "Starting analysis with " + std::to_string(nEvents) + " events...");
+
+    // Add progress tracking variables
+    const int progressStep = std::max(1, nEvents / 100);  // Show progress every 1%
+    int lastProgress = -1;
+    auto showProgress = [&](int current) {
+        int progress = (current * 100) / nEvents;
+        if (progress > lastProgress) {
+            std::string progressBar = "[";
+            for (int i = 0; i < 50; i++) {
+                if (i < progress/2) progressBar += "=";
+                else if (i == progress/2) progressBar += ">";
+                else progressBar += " ";
+            }
+            progressBar += "]";
+            
+            logLocal(DebugLevel::INFO, "\rProgress: " + progressBar + " " + 
+                    std::to_string(progress) + "% (" + 
+                    std::to_string(current) + "/" + 
+                    std::to_string(nEvents) + " events)");
+            lastProgress = progress;
+        }
+    };
 
     // Initialize features
-    std::cout << "Initializing features..." << std::endl;
+    logLocal(DebugLevel::INFO, "Initializing features...");
     std::vector<std::string> features = {
         "JetpT", "JetEta", "JetPhi", "JetMass", "JetFlavor",
         "TrackpT", "TrackEta", "SignedIP2D", "SignedIP3D",
@@ -52,75 +78,84 @@ void bjet_analysis()
     TH1F *hPrimaryVertexZ = new TH1F("hPrimaryVertexZ", "Primary Vertex Z Position;z (cm);Counts", 100, -10, 10);
 
     // Initialize Pythia with more detailed error checking
-    std::cout << "Initializing Pythia..." << std::endl;
+    logLocal(DebugLevel::INFO, "Initializing Pythia...");
     Pythia8::Pythia pythia;
     
     // Basic settings
     pythia.readString("Beams:eCM = 13000.");
-    std::cout << "Set beam energy" << std::endl;
+    logLocal(DebugLevel::DEBUG, "Set beam energy");
     
     pythia.readString("Beams:allowVertexSpread = on");
-    std::cout << "Enabled vertex spread" << std::endl;
+    logLocal(DebugLevel::DEBUG, "Enabled vertex spread");
     
     // More reasonable vertex spread values (in mm)
     pythia.readString("Beams:sigmaVertexX = 0.015");  // 15 μm
     pythia.readString("Beams:sigmaVertexY = 0.015");  // 15 μm
     pythia.readString("Beams:sigmaVertexZ = 0.050");  // 50 μm
-    std::cout << "Set vertex spread parameters" << std::endl;
+    logLocal(DebugLevel::DEBUG, "Set vertex spread parameters");
     
     pythia.readString("HardQCD:all = on");          // Turn on hard QCD processes
     pythia.readString("PhaseSpace:pTHatMin = 20."); // Min pT for hard interaction
-    std::cout << "Set physics process parameters" << std::endl;
+    logLocal(DebugLevel::DEBUG, "Set physics process parameters");
 
     if (!pythia.init()) {
-        std::cout << "ERROR: Pythia initialization failed!" << std::endl;
+        logLocal(DebugLevel::ERROR, "Pythia initialization failed!");
         return;
     }
-    std::cout << "Pythia initialized successfully" << std::endl;
+    logLocal(DebugLevel::INFO, "Pythia initialized successfully");
 
     // Initialize FastJet
     double R = 0.4; // jet radius parameter
     fastjet::JetDefinition jetDef(fastjet::antikt_algorithm, R);
 
-    // Initialize detector simulation and vertex finder
-    DetectorSimulation detector;
-    SecondaryVertexFinder svFinder;
+    // Initialize detector simulation, vertex finder, and DCA smearing
+    DetectorSimulation detector(debugLevel);
+    SecondaryVertexFinder svFinder(debugLevel);
+    DCASmearing::setDebugLevel(debugLevel);
+    DCASmearing dcaSmearer;  // Create instance of DCASmearing
 
-    // Event loop
-    int nEvents = 10000;
+    // Initialize histograms for DCA smearing
+    DCASmearing::initializeHistograms();
+
+    // Event loop with progress
     long totalJets = 0;
     long totalEvents = 0;
-    constexpr int maxConst = 13;
 
-    JTreeHFFeatures<maxConst> treeWriter("bjet_features.root", features);
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    for (int iEvent = 0; iEvent < nEvents; ++iEvent) {
+        // Show progress
+        if (iEvent % progressStep == 0) {
+            showProgress(iEvent);
+            
+            // Show timing information
+            if (iEvent > 0) {
+                auto currentTime = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime);
+                double eventsPerSecond = static_cast<double>(iEvent) / duration.count();
+                int remainingSeconds = static_cast<int>((nEvents - iEvent) / eventsPerSecond);
+                
+                logLocal(DebugLevel::DEBUG, 
+                    "Processing speed: " + std::to_string(eventsPerSecond) + " events/s, " +
+                    "ETA: " + std::to_string(remainingSeconds) + "s");
+            }
+        }
 
-    // Create random number generator
-    TRandom3 random(0); // seed with 0 for reproducibility
-
-    // Define detector resolution (in cm)
-    const double spatialResolution = 0.005; // 50 microns
-
-    // Initialize histograms
-    DCASmearing dcaSmearer;
-    dcaSmearer.initializeHistograms();
-
-    for (int iEvent = 0; iEvent < nEvents; ++iEvent)
-    {
-        std::cout << "\n=== Processing event " << iEvent << " ===" << std::endl;
+        logLocal(DebugLevel::DEBUG, "=== Processing event " + std::to_string(iEvent) + " ===");
         
         if (!pythia.next())
         {
-            std::cout << "Pythia event generation failed" << std::endl;
+            logLocal(DebugLevel::ERROR, "Pythia event generation failed");
             continue;
         }
 
         // Collect tracks
-        std::cout << "Collecting tracks..." << std::endl;
+        logLocal(DebugLevel::DEBUG, "Collecting tracks...");
         std::vector<Track> primaryTracks;
-        std::vector<TParticle> mcparticles;
+        std::vector<JParticle> mcparticles;
         
         // Process particles
-        std::cout << "Processing particles..." << std::endl;
+        logLocal(DebugLevel::DEBUG, "Processing particles...");
         std::vector<fastjet::PseudoJet> particles;
         std::vector<Track> allTracks;
         std::vector<Track> truthTracks;
@@ -129,47 +164,62 @@ void bjet_analysis()
         {
             const Pythia8::Particle &part = pythia.event[i];
             
-            std::cout << "Processing particle " << i 
-                      << " (ID: " << part.id() 
-                      << ", pT: " << part.pT()
-                      << ", eta: " << part.eta()
-                      << ", zProd: " << part.zProd() << " mm)" << std::endl;
+            if (debugLevel >= DebugLevel::VERBOSE) {
+                logLocal(DebugLevel::VERBOSE, "Processing particle " + std::to_string(i) + 
+                    " (ID: " + std::to_string(part.id()) +
+                    ", pT: " + std::to_string(part.pT()) +
+                    ", eta: " + std::to_string(part.eta()) +
+                    ", status: " + std::to_string(part.status()) +
+                    ", charge: " + std::to_string(part.charge()) +
+                    ", zProd: " + std::to_string(part.zProd()) + " mm)");
+            }
 
             // Parton Definition
             if ((part.id() == 5 || part.id() == -5))
             {
-                mcparticles.push_back(convertToTParticle(part));
+                mcparticles.push_back(convertToJParticle(part));
             }
             else if ((part.id() == 4 || part.id() == -4))
             {
-                mcparticles.push_back(convertToTParticle(part));
+                mcparticles.push_back(convertToJParticle(part));
             }
 
             // Select only final state charged particles
-            if (!part.isFinal() || part.charge() == 0)
+            if (!part.isFinal() || part.charge() == 0) {
+                logLocal(DebugLevel::DEBUG, "Skipping particle: not final or not charged");
                 continue;
-
-            // After detector simulation
-            std::cout << "Applying detector simulation..." << std::endl;
-            auto trackParams = detector.smearTrack(part);
-            std::cout << "Smeared z position: " << trackParams.pos.Z() << " cm" << std::endl;
-
-            // Check mother
-            const Pythia8::Particle &mother = pythia.event[part.mother1()];
-            std::cout << "Mother particle ID: " << mother.id() 
-                      << ", isHadron: " << mother.isHadron()
-                      << ", tau: " << mother.tau() << std::endl;
-
-            // Check if particle comes from hadron decay
-            if (!(mother.isHadron() && mother.tau() > 0))
-            {
-                primaryTracks.push_back(trackParams);
             }
 
-            if (abs(part.eta()) > 0.9)
-                continue; // detector acceptance
-            if (part.pT() < 0.15)
-                continue; // pT cut
+            // After detector simulation
+            logLocal(DebugLevel::DEBUG, "Applying detector simulation...");
+            auto trackParams = detector.smearTrack(part);
+            logLocal(DebugLevel::DEBUG, "Smeared z position: " + std::to_string(trackParams.pos.Z()) + " cm");
+
+            // Check mother
+            int mother1 = part.mother1();
+            if (mother1 >= 0 && mother1 < pythia.event.size()) {
+                const Pythia8::Particle &mother = pythia.event[mother1];
+                logLocal(DebugLevel::DEBUG, "Mother particle ID: " + std::to_string(mother.id()) + 
+                    ", isHadron: " + std::to_string(mother.isHadron()) +
+                    ", tau: " + std::to_string(mother.tau()));
+
+                // Check if particle comes from hadron decay
+                if (!(mother.isHadron() && mother.tau() > 0))
+                {
+                    primaryTracks.push_back(trackParams);
+                    logLocal(DebugLevel::DEBUG, "Added to primary tracks");
+                }
+            }
+
+            // Basic acceptance cuts
+            if (abs(part.eta()) > 0.9) {
+                logLocal(DebugLevel::DEBUG, "Skipping: eta out of range");
+                continue;
+            }
+            if (part.pT() < 0.15) {
+                logLocal(DebugLevel::DEBUG, "Skipping: pT too low");
+                continue;
+            }
 
             allTracks.push_back(trackParams);
             truthTracks.push_back(Track(TVector3(part.xProd() * 0.1, part.yProd() * 0.1, part.zProd() * 0.1),
@@ -186,180 +236,312 @@ void bjet_analysis()
             particles.back().set_user_index(allTracks.size() - 1);
         }
 
-        // Find primary vertex
-        std::cout << "Finding primary vertex..." << std::endl;
-        if (primaryTracks.size() < 3)
-        {
-            std::cout << "Too few tracks for vertex finding: " << primaryTracks.size() << std::endl;
+        // Find primary vertex with additional checks
+        logLocal(DebugLevel::DEBUG, "Finding primary vertex...");
+        logLocal(DebugLevel::DEBUG, "Number of primary tracks: " + std::to_string(primaryTracks.size()));
+        
+        if (primaryTracks.empty()) {
+            logLocal(DebugLevel::WARNING, "No primary tracks found, skipping vertex finding");
             continue;
         }
 
-        TVector3 primaryVertex = VertexFinder::findPrimaryVertex(primaryTracks,
+        if (primaryTracks.size() < 3) {
+            logLocal(DebugLevel::WARNING, "Too few tracks for vertex finding: " + std::to_string(primaryTracks.size()));
+            continue;
+        }
+
+        // Add debug output for tracks
+        logLocal(DebugLevel::DEBUG, "\nPrimary track details:");
+        for (size_t i = 0; i < primaryTracks.size(); ++i) {
+            const auto& track = primaryTracks[i];
+            logLocal(DebugLevel::DEBUG, "Track " + std::to_string(i) + ": "
+                      + "pos(" + std::to_string(track.pos.X()) + ", " + std::to_string(track.pos.Y()) + ", " + std::to_string(track.pos.Z()) + ") "
+                      + "mom(" + std::to_string(track.mom.X()) + ", " + std::to_string(track.mom.Y()) + ", " + std::to_string(track.mom.Z()) + ")");
+        }
+
+        try {
+            logLocal(DebugLevel::DEBUG, "\nStarting vertex finding process...");
+            
+            if (primaryTracks.empty()) {
+                logLocal(DebugLevel::WARNING, "No primary tracks available for vertex finding");
+                continue;
+            }
+
+            // Print track information before vertex finding
+            logLocal(DebugLevel::DEBUG, "\nPrimary tracks before vertex finding:");
+            for (size_t i = 0; i < primaryTracks.size(); ++i) {
+                const auto& track = primaryTracks[i];
+                logLocal(DebugLevel::DEBUG, "Track " + std::to_string(i) + ": "
+                          + "pos(" + std::to_string(track.pos.X()) + ", " + std::to_string(track.pos.Y()) + ", " + std::to_string(track.pos.Z()) + ") "
+                          + "mom(" + std::to_string(track.mom.X()) + ", " + std::to_string(track.mom.Y()) + ", " + std::to_string(track.mom.Z()) + ")");
+            }
+
+            TVector3 primaryVertex = VertexFinder::findPrimaryVertex(primaryTracks,
                                                                  0.001, // 10 micron convergence
                                                                  50,    // max iterations
                                                                  1.0,   // temperature
-                                                                 6.0);  // tighter chi2 cut
+                                                                 6.0,   // tighter chi2 cut
+                                                                 debugLevel);  // Pass debug level
 
-        // Fill primary vertex Z position
-        hPrimaryVertexZ->Fill(primaryVertex.Z());
+            logLocal(DebugLevel::DEBUG, "Primary vertex found at: (" + std::to_string(primaryVertex.X()) + ", "
+                      + std::to_string(primaryVertex.Y()) + ", "
+                      + std::to_string(primaryVertex.Z()) + ")");
 
-        // Vertex position check
-        if (std::abs(primaryVertex.Z()) > 10.0 ||
-            std::abs(primaryVertex.X()) > 2.0 ||
-            std::abs(primaryVertex.Y()) > 2.0)
-        {
-            std::cout << "WARNING: Vertex position outside range!" << std::endl;
-            continue;
-        }
-
-        // Jet finding
-        fastjet::ClusterSequence cs(particles, jetDef);
-        std::vector<fastjet::PseudoJet> jets = sorted_by_pt(cs.inclusive_jets(5.0)); // jets with pT > 20 GeV
-
-        // Analyze each jet
-        for (const auto &jet : jets)
-        {
-            hJetPt->Fill(jet.pt());
-            hJetEta->Fill(jet.eta());
-
-            // Get number of constituents
-            std::vector<fastjet::PseudoJet> constituents = jet.constituents();
-            int nConstituents = constituents.size();
-
-            // Fill inclusive histogram
-            hNConstituents->Fill(nConstituents);
-
-            // Get jet flavor
-            int jetFlavor = getJetFlavor(jet, mcparticles, R);
-
-            if (jetFlavor == JetTaggingSpecies::beauty)
-            {
-                hNConstituents_b->Fill(nConstituents);
-                hJetPt_b->Fill(jet.pt());
-            }
-            else if (jetFlavor == JetTaggingSpecies::charm)
-            {
-                hNConstituents_c->Fill(nConstituents);
-                hJetPt_c->Fill(jet.pt());
+            // Safety check for vertex position
+            if (std::isnan(primaryVertex.X()) || std::isnan(primaryVertex.Y()) || std::isnan(primaryVertex.Z())) {
+                logLocal(DebugLevel::WARNING, "Warning: Invalid primary vertex position detected");
+                continue;
             }
 
-            // Collect tracks associated with this jet
-            std::vector<Track> jetTracks;
-            for (const auto &constituent : constituents)
+            // Fill primary vertex Z position
+            hPrimaryVertexZ->Fill(primaryVertex.Z());
+
+            // Vertex position check
+            if (std::abs(primaryVertex.Z()) > 10.0 ||
+                std::abs(primaryVertex.X()) > 2.0 ||
+                std::abs(primaryVertex.Y()) > 2.0)
             {
-                int trackIndex = constituent.user_index();
-                if (trackIndex >= 0 && trackIndex < allTracks.size())
-                {
-                    jetTracks.push_back(allTracks[trackIndex]);
+                logLocal(DebugLevel::WARNING, "WARNING: Vertex position outside range!");
+                continue;
+            }
+
+            // Jet finding with safety checks
+            logLocal(DebugLevel::DEBUG, "\nStarting jet finding...");
+            
+            if (particles.empty()) {
+                logLocal(DebugLevel::WARNING, "No particles available for jet finding");
+                continue;
+            }
+
+            // Print particle information before jet finding
+            logLocal(DebugLevel::DEBUG, "\nParticles before jet finding:");
+            for (size_t i = 0; i < particles.size(); ++i) {
+                const auto& p = particles[i];
+                logLocal(DebugLevel::DEBUG, "Particle " + std::to_string(i) + ": "
+                          + "pT=" + std::to_string(p.pt()) + " "
+                          + "eta=" + std::to_string(p.eta()) + " "
+                          + "phi=" + std::to_string(p.phi()) + " "
+                          + "E=" + std::to_string(p.E()));
+            }
+
+            // Declare variables before try block
+            std::vector<fastjet::PseudoJet> jets;
+            fastjet::ClusterSequence* cs = nullptr;
+
+            // Run clustering with try-catch
+            try {
+                cs = new fastjet::ClusterSequence(particles, jetDef);
+                jets = fastjet::sorted_by_pt(cs->inclusive_jets(5.0));
+
+                logLocal(DebugLevel::DEBUG, "\nFound " + std::to_string(jets.size()) + " jets");
+
+                // Process jets with safety checks
+                for (const auto& jet : jets) {
+                    // Check if jet is valid using FastJet's recommended method
+                    if (jet.E() <= 0 || std::isnan(jet.E())) {
+                        logLocal(DebugLevel::WARNING, "Invalid jet detected (E = " + std::to_string(jet.E()) + ")");
+                        continue;
+                    }
+
+                    // Get jet flavor with safety checks
+                    int jetFlavor = getJetFlavor(jet, mcparticles, R, debugLevel);
+                    
+                    logLocal(DebugLevel::DEBUG, "Jet: pT=" + std::to_string(jet.pt()) +
+                        " eta=" + std::to_string(jet.eta()) +
+                        " phi=" + std::to_string(jet.phi()) +
+                        " flavor=" + std::to_string(jetFlavor));
+
+                    // Get constituents with safety checks
+                    std::vector<fastjet::PseudoJet> constituents = jet.constituents();
+                    
+                    // Fill constituent multiplicity histograms
+                    if (hNConstituents) {
+                        hNConstituents->Fill(constituents.size());
+                        if (jetFlavor == JetTaggingSpecies::beauty && hNConstituents_b) {
+                            hNConstituents_b->Fill(constituents.size());
+                        } else if (jetFlavor == JetTaggingSpecies::charm && hNConstituents_c) {
+                            hNConstituents_c->Fill(constituents.size());
+                        }
+                    }
+
+                    // Find secondary vertices in this jet
+                    std::vector<TVector3> secondaryVertices;
+                    std::vector<double> svMasses;
+                    for (const auto& constituent : constituents) {
+                        int idx = constituent.user_index();
+                        if (idx >= 0 && idx < allTracks.size()) {
+                            const auto& track = allTracks[idx];
+                            // Check if track is from a secondary vertex
+                            if (std::abs(track.dxy) > 0.1 || std::abs(track.dz) > 0.1) {  // 1mm displacement
+                                TVector3 sv(track.pos);
+                                secondaryVertices.push_back(sv);
+                                // Calculate invariant mass (assuming pion mass for tracks)
+                                const double pionMass = 0.13957; // GeV
+                                double E = std::sqrt(track.mom.Mag2() + pionMass*pionMass);
+                                svMasses.push_back(E);
+                            }
+                        }
+                    }
+
+                    // Fill SV-related histograms
+                    if (!secondaryVertices.empty()) {
+                        // Number of SVs per jet
+                        if (hNSVperJet) hNSVperJet->Fill(secondaryVertices.size());
+                        if (jetFlavor == JetTaggingSpecies::beauty && hNSVperJet_b) {
+                            hNSVperJet_b->Fill(secondaryVertices.size());
+                        } else if (jetFlavor == JetTaggingSpecies::charm && hNSVperJet_c) {
+                            hNSVperJet_c->Fill(secondaryVertices.size());
+                        }
+
+                        // Process each secondary vertex
+                        for (size_t i = 0; i < secondaryVertices.size(); ++i) {
+                            const auto& sv = secondaryVertices[i];
+                            double mass = svMasses[i];
+                            
+                            // Calculate decay lengths
+                            double decay2D = std::sqrt(sv.X()*sv.X() + sv.Y()*sv.Y());
+                            double decay3D = sv.Mag();
+
+                            // Fill inclusive histograms
+                            if (hSVMass) hSVMass->Fill(mass);
+                            if (hDecayLength2D) hDecayLength2D->Fill(decay2D);
+                            if (hDecayLength3D) hDecayLength3D->Fill(decay3D);
+
+                            // Fill flavor-specific histograms
+                            if (jetFlavor == JetTaggingSpecies::beauty) {
+                                if (hSVMass_b) hSVMass_b->Fill(mass);
+                                if (hDecayLength2D_b) hDecayLength2D_b->Fill(decay2D);
+                                if (hDecayLength3D_b) hDecayLength3D_b->Fill(decay3D);
+                            } else if (jetFlavor == JetTaggingSpecies::charm) {
+                                if (hSVMass_c) hSVMass_c->Fill(mass);
+                                if (hDecayLength2D_c) hDecayLength2D_c->Fill(decay2D);
+                                if (hDecayLength3D_c) hDecayLength3D_c->Fill(decay3D);
+                            }
+
+                            logLocal(DebugLevel::VERBOSE, "SV in jet: mass=" + std::to_string(mass) +
+                                " decay2D=" + std::to_string(decay2D) +
+                                " decay3D=" + std::to_string(decay3D));
+                        }
+                    }
+
+                    // Fill other jet-related histograms
+                    if (hJetPt) hJetPt->Fill(jet.pt());
+                    if (hJetEta) hJetEta->Fill(jet.eta());
+                    
+                    if (jetFlavor == JetTaggingSpecies::beauty) {
+                        if (hJetPt_b) hJetPt_b->Fill(jet.pt());
+                    } else if (jetFlavor == JetTaggingSpecies::charm) {
+                        if (hJetPt_c) hJetPt_c->Fill(jet.pt());
+                    }
+                }
+
+                // Update counters safely
+                if (totalEvents < std::numeric_limits<long>::max()) {
+                    totalEvents++;
+                    totalJets += jets.size();
+                }
+
+            }
+            catch (const fastjet::Error& e) {
+                logLocal(DebugLevel::ERROR, "FastJet error: " + std::string(e.message()));
+            }
+            catch (const std::exception& e) {
+                logLocal(DebugLevel::ERROR, "Standard exception in jet finding: " + std::string(e.what()));
+            }
+            catch (...) {
+                logLocal(DebugLevel::ERROR, "Unknown exception in jet finding");
+            }
+
+            // Clean up
+            if (cs) {
+                delete cs;
+                cs = nullptr;
+            }
+
+            // Remove duplicate jet finding code
+            if (iEvent % 100 == 0) {
+                logLocal(DebugLevel::INFO, "Processed " + std::to_string(iEvent) + " events");
+            }
+
+            // Apply smearing to all tracks
+            for (size_t i = 0; i < allTracks.size(); i++) {
+                if (i < truthTracks.size()) {  // Add safety check
+                    dcaSmearer.fillHistograms(truthTracks[i], allTracks[i]);
+                } else {
+                    logLocal(DebugLevel::WARNING, "Truth track index out of range");
                 }
             }
 
-            // Find all possible secondary vertices
-            SecondaryVertexFinder svFinder;
-            std::vector<SecondaryVertexFinder::SecVtxInfo> secondaryVertices =
-                svFinder.findSecondaryVertices(jetTracks);
-
-            SecondaryVertexFinder::fillMonitoringHistograms(secondaryVertices);
-            // Fill SV multiplicity histograms
-            hNSVperJet->Fill(secondaryVertices.size());
-
-            if (jetFlavor == JetTaggingSpecies::beauty)
-            {
-                hNSVperJet_b->Fill(secondaryVertices.size());
-            }
-            else if (jetFlavor == JetTaggingSpecies::charm)
-            {
-                hNSVperJet_c->Fill(secondaryVertices.size());
-            }
-
-            // Process each secondary vertex
-            for (const auto &sv : secondaryVertices)
-            {
-                hSVMass->Fill(sv.mass);
-                hDecayLength2D->Fill(SVCalculations::calculateDecayLength2D(primaryVertex, sv.position));
-                hDecayLength3D->Fill(SVCalculations::calculateDecayLength3D(primaryVertex, sv.position));
-
-                // Fill flavor-specific histograms
-                if (jetFlavor == JetTaggingSpecies::beauty)
-                {
-                    hSVMass_b->Fill(sv.mass);
-                    hDecayLength2D_b->Fill(SVCalculations::calculateDecayLength2D(primaryVertex, sv.position));
-                    hDecayLength3D_b->Fill(SVCalculations::calculateDecayLength3D(primaryVertex, sv.position));
-                }
-                else if (jetFlavor == JetTaggingSpecies::charm)
-                {
-                    hSVMass_c->Fill(sv.mass);
-                    hDecayLength2D_c->Fill(SVCalculations::calculateDecayLength2D(primaryVertex, sv.position));
-                    hDecayLength3D_c->Fill(SVCalculations::calculateDecayLength3D(primaryVertex, sv.position));
-                }
-            }
-
-            // Fill jet features
-            treeWriter.getData().mJetpT = jet.pt();
-            treeWriter.getData().mJetEta = jet.eta();
-            treeWriter.getData().mJetPhi = jet.phi();
-            treeWriter.getData().mJetMass = jet.m();
-            treeWriter.getData().mJetFlavor = jetFlavor;
-            treeWriter.getData().mNTracks = jetTracks.size();
-            treeWriter.getData().mNSV = secondaryVertices.size();
-
-            // Fill track features
-            for (int i = 0; i < treeWriter.getData().mNTracks; i++)
-            {
-                treeWriter.getData().mTrackpT[i] = jetTracks[i].mom.Pt();
-                treeWriter.getData().mTrackEta[i] = jetTracks[i].mom.Eta();
-                // treeWriter.getData().mSignedIP2D[i] = calculateSignedIP2D(jetTracks[i], primaryVertex);
-                // treeWriter.getData().mSignedIP3D[i] = calculateSignedIP3D(jetTracks[i], primaryVertex);
-            }
-
-            // Fill SV features
-            for (int i = 0; i < treeWriter.getData().mNSV; i++)
-            {
-                treeWriter.getData().mSVMass[i] = secondaryVertices[i].mass;
-                treeWriter.getData().mDecayLength2D[i] = SVCalculations::calculateDecayLength2D(primaryVertex, secondaryVertices[i].position);
-                treeWriter.getData().mDecayLength3D[i] = SVCalculations::calculateDecayLength3D(primaryVertex, secondaryVertices[i].position);
-            }
-
-            // Fill tree
-            treeWriter.fill();
+            logLocal(DebugLevel::DEBUG, "Event " + std::to_string(iEvent) + " processed successfully");
         }
-
-        // After clustering jets, add to total
-        jets = cs.inclusive_jets(5.0);
-        totalJets += jets.size();
-        totalEvents++;
-
-        // Progress indicator
-        if (iEvent % 100 == 0)
-        {
-            std::cout << "Processed " << iEvent << " events" << std::endl;
+        catch (const std::exception& e) {
+            logLocal(DebugLevel::ERROR, "Exception caught: " + std::string(e.what()));
         }
-
-        // Apply smearing to all tracks
-        for (int i = 0; i < allTracks.size(); i++)
-        {
-            // Fill histograms
-            dcaSmearer.fillHistograms(truthTracks[i], allTracks[i]);
+        catch (...) {
+            logLocal(DebugLevel::ERROR, "Unknown exception caught");
         }
-
-        std::cout << "Event " << iEvent << " processed successfully" << std::endl;
     }
 
-    // Write and close
-    outFile->cd();
-    outFile->Write();
-    outFile->Close();
+    // Show final progress
+    showProgress(nEvents);
+    
+    // Show final statistics
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
+    
+    logLocal(DebugLevel::INFO, "\nProcessing completed:");
+    logLocal(DebugLevel::INFO, "Total time: " + std::to_string(duration.count()) + " seconds");
+    logLocal(DebugLevel::INFO, "Average processing speed: " + 
+            std::to_string(static_cast<double>(nEvents) / duration.count()) + " events/s");
 
-    std::cout << "Analysis completed!" << std::endl;
-
-    // Add safety check before calculating average
-    if (totalEvents > 0)
-    {
+    if (totalEvents > 0) {
         double avgJets = static_cast<double>(totalJets) / totalEvents;
-        std::cout << "Average number of jets with pT > 5 GeV per event: " << avgJets << std::endl;
+        logLocal(DebugLevel::INFO, "Average number of jets per event: " + std::to_string(avgJets));
     }
-    else
-    {
-        std::cout << "No events processed!" << std::endl;
+
+    // Write histograms with safety checks
+    logLocal(DebugLevel::INFO, "\nWriting histograms...");
+    if (outFile && outFile->IsOpen()) {
+        outFile->Write();
+        outFile->Close();
     }
+
+    logLocal(DebugLevel::INFO, "Analysis completed successfully!");
+}
+
+// Update main to accept number of events
+int main(int argc, char* argv[]) {
+    int nEvents = 10000;  // default value
+    DebugLevel debugLevel = DebugLevel::INFO;
+
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-n" || arg == "--nevents") {
+            if (i + 1 < argc) {
+                nEvents = std::atoi(argv[++i]);
+                if (nEvents <= 0) {
+                    std::cerr << "Error: Number of events must be positive\n";
+                    return 1;
+                }
+            }
+        } else if (arg == "-d" || arg == "--debug") {
+            if (i + 1 < argc) {
+                int level = std::atoi(argv[++i]);
+                if (level >= 0 && level <= static_cast<int>(DebugLevel::VERBOSE)) {
+                    debugLevel = static_cast<DebugLevel>(level);
+                }
+            }
+        } else if (arg == "-h" || arg == "--help") {
+            std::cout << "Usage: " << argv[0] << " [options]\n"
+                     << "Options:\n"
+                     << "  -n, --nevents N    Number of events to process (default: 10000)\n"
+                     << "  -d, --debug N      Debug level (0-5, default: 3)\n"
+                     << "  -h, --help         Show this help message\n";
+            return 0;
+        }
+    }
+
+    bjet_analysis(nEvents, debugLevel);
+    return 0;
 }

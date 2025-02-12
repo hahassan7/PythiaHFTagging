@@ -1,11 +1,21 @@
-#ifdef __CLING__
-R__LOAD_LIBRARY(libpythia8.dylib)
-R__ADD_INCLUDE_PATH($PYTHIA_ROOT / include)
-#endif
+#pragma once
 
-#include "JTreeHFFeatures.h"
-#include "Pythia8/Pythia.h"
-#include "Pythia8/ParticleData.h"
+// Include FastJet compatibility layer first
+#include "FastJetCompat.h"
+
+// First include system headers
+#include <vector>
+#include <map>
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <random>
+#include <memory>
+
+// Custom headers
+#include "JParticle.h"
+
+// ROOT headers
 #include "TH1F.h"
 #include "TH2F.h"
 #include "TFile.h"
@@ -15,13 +25,27 @@ R__ADD_INCLUDE_PATH($PYTHIA_ROOT / include)
 #include "TLorentzVector.h"
 #include "TMatrixD.h"
 #include "TProfile.h"
+
+// Pythia headers
+#include "Pythia8/Pythia.h"
+#include "Pythia8/ParticleData.h"
+
+// FastJet headers
+#include "fastjet/PseudoJet.hh"
+#include "fastjet/ClusterSequenceArea.hh"
+#ifndef __FJCORE__
+#include "fastjet/GhostedAreaSpec.hh"
+#endif
+
+#ifdef __CLING__
+R__LOAD_LIBRARY(libpythia8.dylib)
+R__ADD_INCLUDE_PATH($PYTHIA_ROOT / include)
+#endif
+
+#include "JTreeHFFeatures.h"
+#include "TRandom3.h"
+#include "TMatrixD.h"
 #include "TParticle.h"
-#include <vector>
-#include <map>
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <random>
 
 #ifdef __CLING__
 R__LOAD_LIBRARY(libfastjet)
@@ -30,69 +54,140 @@ R__LOAD_LIBRARY(libsiscone_spherical)
 R__LOAD_LIBRARY(libfastjetplugins)
 R__ADD_INCLUDE_PATH($FASTJET_ROOT / include)
 #endif
-#include "fastjet/PseudoJet.hh"
-#include "fastjet/ClusterSequenceArea.hh"
-#ifndef __FJCORE__
-#include "fastjet/GhostedAreaSpec.hh" // for area support
-#endif                                // __FJCORE__
 
-template <typename T, typename U>
-float deltaR(T const &A, U const &B)
+// Forward declarations
+bool isBMeson(int pc);
+bool isDMeson(int pc);
+
+// Define DebugLevel at the very top
+enum class DebugLevel {
+    SILENT = 0,    // No output
+    ERROR = 1,     // Only errors
+    WARNING = 2,   // Errors and warnings
+    INFO = 3,      // Basic run information
+    DEBUG = 4,     // Detailed debugging information
+    VERBOSE = 5    // Very detailed debugging information
+};
+
+// Add logging helper function right after enum
+inline void log(DebugLevel currentLevel, DebugLevel messageLevel, const std::string& message) {
+    if (static_cast<int>(messageLevel) <= static_cast<int>(currentLevel)) {
+        switch (messageLevel) {
+            case DebugLevel::ERROR:
+                std::cout << "\033[1;31m[ERROR]\033[0m " << message << std::endl;
+                break;
+            case DebugLevel::WARNING:
+                std::cout << "\033[1;33m[WARNING]\033[0m " << message << std::endl;
+                break;
+            case DebugLevel::INFO:
+                std::cout << "\033[1;32m[INFO]\033[0m " << message << std::endl;
+                break;
+            case DebugLevel::DEBUG:
+                std::cout << "\033[1;34m[DEBUG]\033[0m " << message << std::endl;
+                break;
+            case DebugLevel::VERBOSE:
+                std::cout << "\033[1;35m[VERBOSE]\033[0m " << message << std::endl;
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+class Track
 {
-    double dPhi, dEta;
-    if constexpr (std::is_same<U, TVector3>::value || std::is_same<U, TParticle>::value)
+public:
+    TVector3 pos;
+    TVector3 mom;
+    double dxy;  // renamed from dcaXY
+    double dz;   // renamed from dcaZ
+    double charge;
+
+    // Default constructor
+    Track() : dxy(0), dz(0), charge(0) {}
+
+    // Constructor from vectors and parameters
+    Track(const TVector3& pos_, const TVector3& mom_, double dxy_, double dz_, double charge_)
+        : pos(pos_), mom(mom_), dxy(dxy_), dz(dz_), charge(charge_) 
     {
+        // Validate inputs
+        if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z())) {
+            throw std::runtime_error("Invalid position in Track constructor");
+        }
+        if (std::isnan(mom.X()) || std::isnan(mom.Y()) || std::isnan(mom.Z())) {
+            throw std::runtime_error("Invalid momentum in Track constructor");
+        }
+        if (std::isnan(dxy) || std::isnan(dz) || std::isnan(charge)) {
+            throw std::runtime_error("Invalid impact parameters or charge in Track constructor");
+        }
+    }
+
+    // Constructor from individual components
+    Track(double x, double px, double y, double py, double z, double pz, double dxy_, double dz_, double charge_)
+        : pos(x, y, z), mom(px, py, pz), dxy(dxy_), dz(dz_), charge(charge_)
+    {
+        // Validate inputs
+        if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z())) {
+            throw std::runtime_error("Invalid position in Track constructor");
+        }
+        if (std::isnan(mom.X()) || std::isnan(mom.Y()) || std::isnan(mom.Z())) {
+            throw std::runtime_error("Invalid momentum in Track constructor");
+        }
+        if (std::isnan(dxy) || std::isnan(dz) || std::isnan(charge)) {
+            throw std::runtime_error("Invalid impact parameters or charge in Track constructor");
+        }
+    }
+};
+
+// Change enum class to enum for implicit conversion to int16_t
+enum JetTaggingSpecies {
+    lightflavour = 0,
+    charm = 4,
+    beauty = 5
+};
+
+// Update deltaR template function to handle different types
+template <typename T, typename U>
+float deltaR(T const &A, U const &B) {
+    double dPhi, dEta;
+    if constexpr (std::is_same<U, TLorentzVector>::value) {
         dPhi = TVector2::Phi_mpi_pi(A.phi() - B.Phi());
         dEta = A.eta() - B.Eta();
-    }
-    else
-    {
+    } else if constexpr (std::is_same<U, TVector3>::value) {
+        // For TVector3, calculate phi and eta
+        dPhi = TVector2::Phi_mpi_pi(A.phi() - B.Phi());
+        dEta = A.eta() - B.PseudoRapidity();
+    } else {
         dPhi = TVector2::Phi_mpi_pi(A.phi() - B.phi());
         dEta = A.eta() - B.eta();
     }
-
     return std::sqrt(dEta * dEta + dPhi * dPhi);
 }
 
-enum JetTaggingSpecies
-{
-    none = 0,
-    charm = 1,
-    beauty = 2,
-    lightflavour = 3,
-    lightquark = 4,
-    gluon = 5
-};
-
-struct Track
-{
-    TVector3 pos;
-    TVector3 mom;
-    double dcaXY;
-    double dcaZ;
-    double charge;
-
-    Track(const TVector3 &p = TVector3(), const TVector3 &m = TVector3(),
-          double dxy = 0, double dz = 0, double q = 0)
-        : pos(p), mom(m), dcaXY(dxy), dcaZ(dz), charge(q) {}
-};
-
+// Update getJetFlavor template function to include debug level
 template <typename AnyJet, typename AllMCParticles>
-int16_t getJetFlavor(AnyJet const &jet, AllMCParticles const &mcparticles, float maxDistance = 0.4)
+int16_t getJetFlavor(AnyJet const &jet, 
+                     AllMCParticles const &mcparticles, 
+                     float maxDistance = 0.4,
+                     DebugLevel debugLevel = DebugLevel::INFO)
 {
     bool charmQuark = false;
     for (auto const &mcpart : mcparticles)
     {
-        int pdgcode = mcpart.GetPdgCode();
+        int pdgcode = mcpart.pdgId();
         if (std::abs(pdgcode) == 21 || (std::abs(pdgcode) >= 1 && std::abs(pdgcode) <= 5))
         {
             double dR = deltaR(jet, mcpart);
+            log(debugLevel, DebugLevel::VERBOSE, 
+                "Checking particle PDG=" + std::to_string(pdgcode) + 
+                " deltaR=" + std::to_string(dR));
 
             if (dR < maxDistance)
             {
                 if (std::abs(pdgcode) == 5)
                 {
-                    return JetTaggingSpecies::beauty; // Beauty jet
+                    log(debugLevel, DebugLevel::DEBUG, "Found b-jet match");
+                    return beauty; // Beauty jet
                 }
                 else if (std::abs(pdgcode) == 4)
                 {
@@ -104,163 +199,95 @@ int16_t getJetFlavor(AnyJet const &jet, AllMCParticles const &mcparticles, float
 
     if (charmQuark)
     {
-        return JetTaggingSpecies::charm; // Charm jet
+        log(debugLevel, DebugLevel::DEBUG, "Found c-jet match");
+        return charm; // Charm jet
     }
 
-    return JetTaggingSpecies::lightflavour; // Light flavor jet
+    log(debugLevel, DebugLevel::DEBUG, "No heavy flavor match found");
+    return lightflavour; // Light flavor jet
 }
 
-//________________________________________________________________________
-bool isBMeson(int pc)
+enum class SmearingMethod
 {
-    int bPdG[] = {511, 521, 10511, 10521, 513, 523, 10513, 10523, 20513, 20523, 20513, 20523, 515, 525, 531,
-                  10531, 533, 10533, 20533, 535, 541, 10541, 543, 10543, 20543, 545, 551, 10551, 100551,
-                  110551, 200551, 210551, 553, 10553, 20553, 30553, 100553, 110553, 120553, 130553, 200553, 210553, 220553,
-                  300553, 9000533, 9010553, 555, 10555, 20555, 100555, 110555, 120555, 200555, 557, 100557, 5122, 5112, 5212, 5222, 5114, 5214, 5224, 5132, 5232, 5312, 5322, 5314, 5324, 5332, 5334, 5142, 5242, 5412, 5422, 5414, 5424, 5342, 5432, 5434, 5442, 5444, 5512, 5522, 5514, 5524, 5532,
-                  5534, 5542, 5544, 5554};
-    for (int i = 0; i < (int)(sizeof(bPdG) / sizeof(int)); ++i)
-        if (std::abs(pc) == bPdG[i])
-            return true;
-    return false;
-}
-//________________________________________________________________________
-bool isDMeson(int pc)
-{
-    int bPdG[] = {411, 421, 10411, 10421, 413, 423, 10413, 10423, 20431, 20423, 415,
-                  425, 431, 10431, 433, 10433, 20433, 435, 441, 10441, 100441, 443, 10443, 20443,
-                  100443, 30443, 9000443, 9010443, 9020443, 445, 100445, 4122, 4222, 4212, 4112, 4224, 4214, 4114, 4232, 4132, 4322, 4312, 4324, 4314, 4332, 4334, 4412, 4422, 4414, 4424, 4432, 4434, 4444};
-    for (int i = 0; i < (int)(sizeof(bPdG) / sizeof(int)); ++i)
-        if (std::abs(pc) == bPdG[i])
-            return true;
-    return false;
-}
+    NONE,
+    GAUSSIAN,
+    PT_DEPENDENT
+};
 
-// Detector resolution simulation
 class DetectorSimulation
 {
 private:
-    TRandom3 *rand;
-
-    // Track parameter resolutions
-    const double dcaXYParam[2] = {4.0e-4, 20.0e-4};  // [µm] (offset, pt_slope)
-    const double dcaZParam[2] = {4.0e-4, 20.0e-4};   // [µm]
-    const double ptParam[3] = {0.005, 0.01, 0.0003}; // pt resolution
-    const double phiRes = 0.001;                     // [rad]
-    const double thetaRes = 0.001;                   // [rad]
-
-    // Vertex resolutions
-    const double vtxXYRes = 12.0; // [µm] in pp
-    const double vtxZRes = 15.0;  // [µm] in pp
+    TRandom3 random;
+    const double spatialResolution = 0.005; // 50 microns
+    const double momentumResolution = 0.01; // 1%
+    DebugLevel debugLevel;
+    
+    // DCA resolution parameters
+    std::array<double, 2> dcaXYParam = {0.0015, 0.005}; // cm
+    std::array<double, 2> dcaZParam = {0.0020, 0.005};  // cm
 
 public:
-    DetectorSimulation() : rand(new TRandom3(0)) {}
+    DetectorSimulation(DebugLevel level = DebugLevel::INFO) 
+        : random(0), debugLevel(level) {} // Initialize with seed 0 for reproducibility
 
-    // Different smearing methods
-    enum class SmearingMethod
-    {
-        GAUSSIAN,
-        PT_DEPENDENT,
-        NONE // For truth values
-    };
+    // Add smearDCA declaration
+    void smearDCA(const Pythia8::Particle &parttobesmeared, Track &smearedTrack, SmearingMethod method);
 
-    void smearDCA(const Pythia8::Particle &parttobesmeared, Track &smearedTrack, SmearingMethod method = SmearingMethod::PT_DEPENDENT)
-    {
-        double xProd = parttobesmeared.xProd() * 0.1;
-        double yProd = parttobesmeared.yProd() * 0.1;
-        double zProd = parttobesmeared.zProd() * 0.1;
-        double pT = parttobesmeared.pT();
-        double eta = parttobesmeared.eta();
+    Track smearTrack(const Pythia8::Particle& part) {
+        log(debugLevel, DebugLevel::DEBUG, "Smearing track with parameters:");
+        log(debugLevel, DebugLevel::DEBUG, "Original position: (" + 
+            std::to_string(part.xProd() * 0.1) + ", " + 
+            std::to_string(part.yProd() * 0.1) + ", " + 
+            std::to_string(part.zProd() * 0.1) + ") cm");
+        log(debugLevel, DebugLevel::DEBUG, "Original momentum: (" + 
+            std::to_string(part.px()) + ", " + 
+            std::to_string(part.py()) + ", " + 
+            std::to_string(part.pz()) + ") GeV");
 
-        switch (method)
-        {
-        case SmearingMethod::PT_DEPENDENT:
-        {
+        // Create track with all parameters
+        Track params(
+            part.xProd() * 0.1,  // x position
+            part.px(),           // px
+            part.yProd() * 0.1,  // y position
+            part.py(),           // py
+            part.zProd() * 0.1,  // z position
+            part.pz(),           // pz
+            std::copysign(std::sqrt(part.xProd() * part.xProd() + 
+                                   part.yProd() * part.yProd()), 
+                         part.yProd()) * 0.1,  // dxy
+            part.zProd() * 0.1,  // dz
+            part.charge()         // charge
+        );
 
-            if (pT < 0.1)
-            {
-                pT = 0.1;
-            }
+        // Apply DCA smearing
+        smearDCA(part, params, SmearingMethod::PT_DEPENDENT);
 
-            std::cout << "pT: " << std::fixed << std::setprecision(10) << pT << " eta: " << std::fixed << std::setprecision(10) << eta << std::endl;
-
-            // Calculate resolutions
-            double sigmaXY = std::sqrt(dcaXYParam[0] * dcaXYParam[0] + (dcaXYParam[1] * dcaXYParam[1]) / (pT * pT));
-            double sigmaZ = std::sqrt(dcaZParam[0] * dcaZParam[0] + (dcaZParam[1] * dcaZParam[1]) / (pT * pT));
-
-            std::cout << "sigmaXY: " << std::fixed << std::setprecision(10) << sigmaXY << " sigmaZ: " << std::fixed << std::setprecision(10) << sigmaZ << std::endl;
-
-            // Add eta dependence (resolution degrades at higher eta)
-            double etaFactor = 1.0 + 0.1 * std::abs(eta); // Approximate effect
-            sigmaXY *= etaFactor;
-            sigmaZ *= etaFactor;
-
-            // Apply smearing
-            smearedTrack.dcaXY = rand->Gaus(std::copysign(std::sqrt(xProd * xProd + yProd * yProd), yProd), sigmaXY);
-            smearedTrack.dcaZ = rand->Gaus(zProd, sigmaZ);
-            break;
-        }
-
-        case SmearingMethod::GAUSSIAN:
-        {
-            // Fixed resolution based on average ITS2 performance
-            const double sigmaXY = 0.0010; // 10 μm -> cm
-            const double sigmaZ = 0.0010;  // 10 μm -> cm
-
-            smearedTrack.dcaXY = rand->Gaus(std::copysign(std::sqrt(xProd * xProd + yProd * yProd), yProd), sigmaXY);
-            smearedTrack.dcaZ = rand->Gaus(zProd, sigmaZ);
-            break;
-        }
-
-        case SmearingMethod::NONE:
-        default:
-            break;
-        }
-    }
-
-    // Function to smear pT based on ALICE ITS resolution
-    double smear_pT(double pT)
-    {
-        // Compute momentum resolution
-        double sigma_pT_over_pT = std::sqrt(ptParam[0] * ptParam[0] + (ptParam[1] / pT) * (ptParam[1] / pT) + (ptParam[2] * pT) * (ptParam[2] * pT));
-
-        // Apply smearing
-        double smeared_pT = rand->Gaus(pT, sigma_pT_over_pT);
-        return smeared_pT;
-    }
-
-    Track smearTrack(const Pythia8::Particle &part)
-    {
-        Track params = Track();
-
-        smearDCA(part, params);
-
-        // Smear momentum
-        double pt = smear_pT(part.pT());
-        double phi = part.phi() + rand->Gaus(0, phiRes);
-        double theta = part.theta() + rand->Gaus(0, thetaRes);
-
-        params.mom.SetPtThetaPhi(pt, theta, phi);
-        params.charge = part.charge();
-
-        // Calculate position at DCA
-        // TODO: Check if this is correct
-        params.pos = TVector3(std::abs(params.dcaXY) * sin(phi),
-                              std::abs(params.dcaXY) * cos(phi),
-                              params.dcaZ);
+        log(debugLevel, DebugLevel::DEBUG, "Created track with parameters:");
+        log(debugLevel, DebugLevel::DEBUG, "Position: (" + 
+            std::to_string(params.pos.X()) + ", " + 
+            std::to_string(params.pos.Y()) + ", " + 
+            std::to_string(params.pos.Z()) + ") cm");
+        log(debugLevel, DebugLevel::DEBUG, "Momentum: (" + 
+            std::to_string(params.mom.X()) + ", " + 
+            std::to_string(params.mom.Y()) + ", " + 
+            std::to_string(params.mom.Z()) + ") GeV");
+        log(debugLevel, DebugLevel::DEBUG, "Impact parameters: dxy = " + 
+            std::to_string(params.dxy) + " cm, dz = " + 
+            std::to_string(params.dz) + " cm");
 
         return params;
     }
 
     void smearPrimaryVertex(TVector3 &primaryVtx)
     {
-        primaryVtx.SetX(rand->Gaus(primaryVtx.X(), vtxXYRes * 1e-4));
-        primaryVtx.SetY(rand->Gaus(primaryVtx.Y(), vtxXYRes * 1e-4));
-        primaryVtx.SetZ(rand->Gaus(primaryVtx.Z(), vtxZRes * 1e-4));
+        primaryVtx.SetX(random.Gaus(primaryVtx.X(), spatialResolution * 1e-4));
+        primaryVtx.SetY(random.Gaus(primaryVtx.Y(), spatialResolution * 1e-4));
+        primaryVtx.SetZ(random.Gaus(primaryVtx.Z(), spatialResolution * 1e-4));
     }
 
     ~DetectorSimulation()
     {
-        delete rand;
+        // Destructor implementation if needed
     }
 };
 
@@ -274,6 +301,7 @@ private:
     const double maxRadialDist = 10.0; // cm
     const double maxZDist = 12.0;      // cm
     const double minTrackPt = 0.3;     // GeV/c
+    DebugLevel debugLevel;
 
     struct TrackAtVertex
     {
@@ -292,9 +320,14 @@ public:
         double chi2;
     };
 
+    SecondaryVertexFinder(DebugLevel level = DebugLevel::INFO) : debugLevel(level) {}
+
     // Modified to return vector of SVs
     std::vector<SecVtxInfo> findSecondaryVertices(const std::vector<Track> &inputTracks)
     {
+        log(debugLevel, DebugLevel::DEBUG, "Starting secondary vertex finding...");
+        log(debugLevel, DebugLevel::DEBUG, "Input tracks: " + std::to_string(inputTracks.size()));
+
         std::vector<SecVtxInfo> vertices;
 
         // First apply track cuts
@@ -343,7 +376,6 @@ public:
     {
         static TH1F *hSVRadialDist = new TH1F("hSVRadialDist", "SV Radial Distance;R (cm);Counts", 100, 0, 20);
         static TH1F *hSVZDist = new TH1F("hSVZDist", "SV Z Distance;|Z| (cm);Counts", 120, 0, 20);
-        static TH1F *hTrackPt = new TH1F("hTrackPt", "Track p_{T} at SV;p_{T} (GeV/c);Counts", 100, 0, 100);
 
         for (const auto &vtx : vertices)
         {
@@ -351,9 +383,6 @@ public:
                                  vtx.position.Y() * vtx.position.Y());
             hSVRadialDist->Fill(r);
             hSVZDist->Fill(std::abs(vtx.position.Z()));
-
-            // Track pT histogram would need access to the tracks
-            // You might need to modify the SecVtxInfo struct to store track information
         }
     }
 
@@ -556,10 +585,15 @@ public:
                                       double convergenceDist = 0.01, // in cm
                                       int maxIterations = 100,
                                       double temperatureScale = 2.0, // Controls how fast weights change
-                                      double chi2Cut = 9.0)
+                                      double chi2Cut = 9.0,
+                                      DebugLevel debugLevel = DebugLevel::INFO)
     { // 3 sigma cut in 3D
+        log(debugLevel, DebugLevel::DEBUG, "Starting primary vertex finding...");
+        log(debugLevel, DebugLevel::DEBUG, "Number of tracks: " + std::to_string(tracks.size()));
+
         if (tracks.empty())
         {
+            log(debugLevel, DebugLevel::WARNING, "No tracks provided for vertex finding");
             return TVector3(0., 0., 0.);
         }
 
@@ -637,75 +671,14 @@ public:
 class DCASmearing
 {
 public:
-    // Update histogram ranges to match ALICE scales
-    static void initializeHistograms()
-    {
-        // DCA XY (finer binning near zero)
-        hDCAxy_Truth = new TH1F("hDCAxy_Truth", "Truth DCA_{xy};DCA_{xy} (cm);Counts",
-                                200, -1.0, 1.0); // ±1 mm range
-        hDCAxy_Smeared = new TH1F("hDCAxy_Smeared", "Smeared DCA_{xy};DCA_{xy} (cm);Counts",
-                                  200, -1.0, 1.0);
-        hDCAxy_Diff = new TH1F("hDCAxy_Diff", "Smeared - Truth DCA_{xy};#Delta DCA_{xy} (cm);Counts",
-                               200, -0.01, 0.01); // ±100 μm range
-
-        // DCA Z
-        hDCAz_Truth = new TH1F("hDCAz_Truth", "Truth DCA_{z};DCA_{z} (cm);Counts",
-                               200, -1.0, 1.0);
-        hDCAz_Smeared = new TH1F("hDCAz_Smeared", "Smeared DCA_{z};DCA_{z} (cm);Counts",
-                                 200, -1.0, 1.0);
-        hDCAz_Diff = new TH1F("hDCAz_Diff", "Smeared - Truth DCA_{z};#Delta DCA_{z} (cm);Counts",
-                              200, -0.01, 0.01);
-
-        // pT-dependent resolution (log scale in pT)
-        hDCAxy_vs_pT = new TH2F("hDCAxy_vs_pT", "DCA_{xy} vs p_{T};p_{T} (GeV/c);DCA_{xy} (cm)",
-                                100, 0.1, 20, 200, -0.1, 0.1);
-        hDCAz_vs_pT = new TH2F("hDCAz_vs_pT", "DCA_{z} vs p_{T};p_{T} (GeV/c);DCA_{z} (cm)",
-                               100, 0.1, 20, 200, -0.1, 0.1);
-
-        // Fill resolution vs pT plots
-        hResolutionXY_vs_pT = new TProfile("hResolutionXY_vs_pT",
-                                           "DCA_{xy} Resolution vs p_{T};p_{T} (GeV/c);#sigma_{xy} (cm)",
-                                           100, 0.1, 20);
-        hResolutionZ_vs_pT = new TProfile("hResolutionZ_vs_pT",
-                                          "DCA_{z} Resolution vs p_{T};p_{T} (GeV/c);#sigma_{z} (cm)",
-                                          100, 0.1, 20);
-
-        // Eta-dependent histograms
-        hDCAxy_vs_eta = new TH2F("hDCAxy_vs_eta", "DCA_{xy} vs #eta;#eta;DCA_{xy} (cm)",
-                                 100, -2.5, 2.5, 200, -1.0, 1.0);
-        hDCAz_vs_eta = new TH2F("hDCAz_vs_eta", "DCA_{z} vs #eta;#eta;DCA_{z} (cm)",
-                                100, -2.5, 2.5, 200, -1.0, 1.0);
-    }
-
-    static void fillHistograms(const Track &truthPart, const Track &smearedPart)
-    {
-        double pT = truthPart.mom.Pt();
-        double eta = truthPart.mom.Eta();
-
-        // Fill DCA distributions
-        hDCAxy_Truth->Fill(truthPart.dcaXY);
-        hDCAxy_Smeared->Fill(smearedPart.dcaXY);
-        hDCAxy_Diff->Fill(smearedPart.dcaXY - truthPart.dcaXY);
-
-        hDCAz_Truth->Fill(truthPart.dcaZ);
-        hDCAz_Smeared->Fill(smearedPart.dcaZ);
-        hDCAz_Diff->Fill(smearedPart.dcaZ - truthPart.dcaZ);
-
-        // Fill pT-dependent histograms
-        hDCAxy_vs_pT->Fill(pT, smearedPart.dcaXY);
-        hDCAz_vs_pT->Fill(pT, smearedPart.dcaZ);
-
-        // Fill resolution profiles
-        hResolutionXY_vs_pT->Fill(pT, std::abs(smearedPart.dcaXY - truthPart.dcaXY));
-        hResolutionZ_vs_pT->Fill(pT, std::abs(smearedPart.dcaZ - truthPart.dcaZ));
-
-        // Fill eta-dependent histograms
-        hDCAxy_vs_eta->Fill(eta, smearedPart.dcaXY);
-        hDCAz_vs_eta->Fill(eta, smearedPart.dcaZ);
+    static void initializeHistograms();
+    static void fillHistograms(const Track &truthPart, const Track &smearedPart);
+    static void setDebugLevel(DebugLevel level) {
+        debugLevel = level;
     }
 
 private:
-    // All histogram declarations
+    static DebugLevel debugLevel;
     static TH1F *hDCAxy_Truth;
     static TH1F *hDCAxy_Smeared;
     static TH1F *hDCAxy_Diff;
@@ -716,35 +689,12 @@ private:
     static TH2F *hDCAz_vs_pT;
     static TProfile *hResolutionXY_vs_pT;
     static TProfile *hResolutionZ_vs_pT;
-    // Add eta-dependent histograms
     static TH2F *hDCAxy_vs_eta;
     static TH2F *hDCAz_vs_eta;
 };
 
-// Initialize all static histogram pointers
-TH1F *DCASmearing::hDCAxy_Truth = nullptr;
-TH1F *DCASmearing::hDCAxy_Smeared = nullptr;
-TH1F *DCASmearing::hDCAxy_Diff = nullptr;
-TH1F *DCASmearing::hDCAz_Truth = nullptr;
-TH1F *DCASmearing::hDCAz_Smeared = nullptr;
-TH1F *DCASmearing::hDCAz_Diff = nullptr;
-TH2F *DCASmearing::hDCAxy_vs_pT = nullptr;
-TH2F *DCASmearing::hDCAz_vs_pT = nullptr;
-TProfile *DCASmearing::hResolutionXY_vs_pT = nullptr;
-TProfile *DCASmearing::hResolutionZ_vs_pT = nullptr;
-TH2F *DCASmearing::hDCAxy_vs_eta = nullptr;
-TH2F *DCASmearing::hDCAz_vs_eta = nullptr;
+// Initialize static member
+DebugLevel DCASmearing::debugLevel = DebugLevel::INFO;
 
-TParticle convertToTParticle(const Pythia8::Particle &part)
-{
-    return TParticle(
-        part.id(),                                             // pdg code
-        part.status(),                                         // status
-        part.mother1(),                                        // mother1
-        part.mother2(),                                        // mother2
-        part.daughter1(),                                      // daughter1
-        part.daughter2(),                                      // daughter2
-        part.px(), part.py(), part.pz(), part.e(),             // momentum
-        part.xProd(), part.yProd(), part.zProd(), part.tProd() // production vertex
-    );
-}
+// Add the declaration for convertToTParticle
+TParticle convertToTParticle(const Pythia8::Particle& part);

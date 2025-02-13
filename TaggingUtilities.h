@@ -60,104 +60,143 @@ bool isBMeson(int pc);
 bool isDMeson(int pc);
 
 // Define DebugLevel at the very top
-enum class DebugLevel {
-    SILENT = 0,    // No output
-    ERROR = 1,     // Only errors
-    WARNING = 2,   // Errors and warnings
-    INFO = 3,      // Basic run information
-    DEBUG = 4,     // Detailed debugging information
-    VERBOSE = 5    // Very detailed debugging information
+enum class DebugLevel
+{
+    SILENT = 0,  // No output
+    ERROR = 1,   // Only errors
+    WARNING = 2, // Errors and warnings
+    INFO = 3,    // Basic run information
+    DEBUG = 4,   // Detailed debugging information
+    VERBOSE = 5  // Very detailed debugging information
 };
 
 // Add logging helper function right after enum
-inline void log(DebugLevel currentLevel, DebugLevel messageLevel, const std::string& message) {
-    if (static_cast<int>(messageLevel) <= static_cast<int>(currentLevel)) {
-        switch (messageLevel) {
-            case DebugLevel::ERROR:
-                std::cout << "\033[1;31m[ERROR]\033[0m " << message << std::endl;
-                break;
-            case DebugLevel::WARNING:
-                std::cout << "\033[1;33m[WARNING]\033[0m " << message << std::endl;
-                break;
-            case DebugLevel::INFO:
-                std::cout << "\033[1;32m[INFO]\033[0m " << message << std::endl;
-                break;
-            case DebugLevel::DEBUG:
-                std::cout << "\033[1;34m[DEBUG]\033[0m " << message << std::endl;
-                break;
-            case DebugLevel::VERBOSE:
-                std::cout << "\033[1;35m[VERBOSE]\033[0m " << message << std::endl;
-                break;
-            default:
-                break;
+inline void log(DebugLevel currentLevel, DebugLevel messageLevel, const std::string &message)
+{
+    if (static_cast<int>(messageLevel) <= static_cast<int>(currentLevel))
+    {
+        switch (messageLevel)
+        {
+        case DebugLevel::ERROR:
+            std::cout << "\033[1;31m[ERROR]\033[0m " << message << std::endl;
+            break;
+        case DebugLevel::WARNING:
+            std::cout << "\033[1;33m[WARNING]\033[0m " << message << std::endl;
+            break;
+        case DebugLevel::INFO:
+            std::cout << "\033[1;32m[INFO]\033[0m " << message << std::endl;
+            break;
+        case DebugLevel::DEBUG:
+            std::cout << "\033[1;34m[DEBUG]\033[0m " << message << std::endl;
+            break;
+        case DebugLevel::VERBOSE:
+            std::cout << "\033[1;35m[VERBOSE]\033[0m " << message << std::endl;
+            break;
+        default:
+            break;
         }
     }
 }
 
 class Track
 {
-public:
+private:
     TVector3 pos;
     TVector3 mom;
-    double dxy;  // renamed from dcaXY
-    double dz;   // renamed from dcaZ
+    double dcaXY;
+    double dcaZ;
     double charge;
 
-    // Default constructor
-    Track() : dxy(0), dz(0), charge(0) {}
+public:
+    // Constructors
+    Track() : pos(TVector3()), mom(TVector3()), dcaXY(0), dcaZ(0), charge(0) {}
 
-    // Constructor from vectors and parameters
-    Track(const TVector3& pos_, const TVector3& mom_, double dxy_, double dz_, double charge_)
-        : pos(pos_), mom(mom_), dxy(dxy_), dz(dz_), charge(charge_) 
+    Track(const TVector3 &p, const TVector3 &m, double dxy = 0, double dz = 0, double q = 0)
+        : pos(p), mom(m), dcaXY(dxy), dcaZ(dz), charge(q)
     {
         // Validate inputs
-        if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z())) {
+        if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z()))
+        {
             throw std::runtime_error("Invalid position in Track constructor");
         }
-        if (std::isnan(mom.X()) || std::isnan(mom.Y()) || std::isnan(mom.Z())) {
+        if (std::isnan(mom.X()) || std::isnan(mom.Y()) || std::isnan(mom.Z()))
+        {
             throw std::runtime_error("Invalid momentum in Track constructor");
         }
-        if (std::isnan(dxy) || std::isnan(dz) || std::isnan(charge)) {
+        if (std::isnan(dxy) || std::isnan(dz) || std::isnan(charge))
+        {
             throw std::runtime_error("Invalid impact parameters or charge in Track constructor");
         }
     }
 
-    // Constructor from individual components
-    Track(double x, double px, double y, double py, double z, double pz, double dxy_, double dz_, double charge_)
-        : pos(x, y, z), mom(px, py, pz), dxy(dxy_), dz(dz_), charge(charge_)
+    Track(const Track &other)
+        : pos(other.pos), mom(other.mom), dcaXY(other.dcaXY), dcaZ(other.dcaZ), charge(other.charge)
     {
         // Validate inputs
-        if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z())) {
+        if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z()))
+        {
             throw std::runtime_error("Invalid position in Track constructor");
         }
-        if (std::isnan(mom.X()) || std::isnan(mom.Y()) || std::isnan(mom.Z())) {
+        if (std::isnan(mom.X()) || std::isnan(mom.Y()) || std::isnan(mom.Z()))
+        {
             throw std::runtime_error("Invalid momentum in Track constructor");
         }
-        if (std::isnan(dxy) || std::isnan(dz) || std::isnan(charge)) {
+        if (std::isnan(dcaXY) || std::isnan(dcaZ) || std::isnan(charge))
+        {
             throw std::runtime_error("Invalid impact parameters or charge in Track constructor");
         }
     }
+
+    // Getters
+    const TVector3 &getPosition() const { return pos; }
+    const TVector3 &getMomentum() const { return mom; }
+    double getDCAxy() const { return dcaXY; }
+    double getDCAz() const { return dcaZ; }
+    double getCharge() const { return charge; }
+
+    // Setters
+    void setPosition(const TVector3 &p) { pos = p; }
+    void setMomentum(const TVector3 &m) { mom = m; }
+    void setDCAxy(double dxy) { dcaXY = dxy; }
+    void setDCAz(double dz) { dcaZ = dz; }
+    void setCharge(double q) { charge = q; }
+
+    // Utility functions
+    double pt() const { return mom.Pt(); }
+    double eta() const { return mom.Eta(); }
+    double phi() const { return mom.Phi(); }
+    double p() const { return mom.Mag(); }
+
+    // Friend class declaration for DetectorSimulation
+    friend class DetectorSimulation;
 };
 
 // Change enum class to enum for implicit conversion to int16_t
-enum JetTaggingSpecies {
+enum JetTaggingSpecies
+{
     lightflavour = 0,
-    charm = 4,
-    beauty = 5
+    charm = 1,
+    beauty = 2
 };
 
 // Update deltaR template function to handle different types
 template <typename T, typename U>
-float deltaR(T const &A, U const &B) {
+float deltaR(T const &A, U const &B)
+{
     double dPhi, dEta;
-    if constexpr (std::is_same<U, TLorentzVector>::value) {
+    if constexpr (std::is_same<U, TLorentzVector>::value)
+    {
         dPhi = TVector2::Phi_mpi_pi(A.phi() - B.Phi());
         dEta = A.eta() - B.Eta();
-    } else if constexpr (std::is_same<U, TVector3>::value) {
+    }
+    else if constexpr (std::is_same<U, TVector3>::value)
+    {
         // For TVector3, calculate phi and eta
         dPhi = TVector2::Phi_mpi_pi(A.phi() - B.Phi());
         dEta = A.eta() - B.PseudoRapidity();
-    } else {
+    }
+    else
+    {
         dPhi = TVector2::Phi_mpi_pi(A.phi() - B.phi());
         dEta = A.eta() - B.eta();
     }
@@ -166,8 +205,8 @@ float deltaR(T const &A, U const &B) {
 
 // Update getJetFlavor template function to include debug level
 template <typename AnyJet, typename AllMCParticles>
-int16_t getJetFlavor(AnyJet const &jet, 
-                     AllMCParticles const &mcparticles, 
+int16_t getJetFlavor(AnyJet const &jet,
+                     AllMCParticles const &mcparticles,
                      float maxDistance = 0.4,
                      DebugLevel debugLevel = DebugLevel::INFO)
 {
@@ -178,9 +217,9 @@ int16_t getJetFlavor(AnyJet const &jet,
         if (std::abs(pdgcode) == 21 || (std::abs(pdgcode) >= 1 && std::abs(pdgcode) <= 5))
         {
             double dR = deltaR(jet, mcpart);
-            log(debugLevel, DebugLevel::VERBOSE, 
-                "Checking particle PDG=" + std::to_string(pdgcode) + 
-                " deltaR=" + std::to_string(dR));
+            log(debugLevel, DebugLevel::VERBOSE,
+                "Checking particle PDG=" + std::to_string(pdgcode) +
+                    " deltaR=" + std::to_string(dR));
 
             if (dR < maxDistance)
             {
@@ -218,71 +257,62 @@ class DetectorSimulation
 {
 private:
     TRandom3 random;
-    const double spatialResolution = 0.005; // 50 microns
-    const double momentumResolution = 0.01; // 1%
+
+    // Resolution parameters
+    static constexpr double kDCAxyOffset = 4.0e-4; // 4 μm -> 0.004 cm
+    static constexpr double kDCAxySlope = 20.0e-4; // 20 μm -> 0.02 cm
+    static constexpr double kDCAzOffset = 4.0e-4;  // 4 μm -> 0.004 cm
+    static constexpr double kDCAzSlope = 20.0e-4;  // 20 μm -> 0.02 cm
+    static constexpr double kPtResA = 0.005;       // Constant term
+    static constexpr double kPtResB = 0.01;        // 1/pT term
+    static constexpr double kPtResC = 0.0003;      // pT term
+    static constexpr double kPhiRes = 0.001;       // [rad]
+    static constexpr double kThetaRes = 0.001;     // [rad]
+    static constexpr double kVtxXYRes = 12e-4;     // 12 μm -> 0.0012 cm
+    static constexpr double kVtxZRes = 15e-4;      // 15 μm -> 0.0015 cm
+
     DebugLevel debugLevel;
-    
-    // DCA resolution parameters
-    std::array<double, 2> dcaXYParam = {0.0015, 0.005}; // cm
-    std::array<double, 2> dcaZParam = {0.0020, 0.005};  // cm
 
 public:
-    DetectorSimulation(DebugLevel level = DebugLevel::INFO) 
+    DetectorSimulation(DebugLevel level = DebugLevel::INFO)
         : random(0), debugLevel(level) {} // Initialize with seed 0 for reproducibility
 
-    // Add smearDCA declaration
-    void smearDCA(const Pythia8::Particle &parttobesmeared, Track &smearedTrack, SmearingMethod method);
-
-    Track smearTrack(const Pythia8::Particle& part) {
-        log(debugLevel, DebugLevel::DEBUG, "Smearing track with parameters:");
-        log(debugLevel, DebugLevel::DEBUG, "Original position: (" + 
-            std::to_string(part.xProd() * 0.1) + ", " + 
-            std::to_string(part.yProd() * 0.1) + ", " + 
-            std::to_string(part.zProd() * 0.1) + ") cm");
-        log(debugLevel, DebugLevel::DEBUG, "Original momentum: (" + 
-            std::to_string(part.px()) + ", " + 
-            std::to_string(part.py()) + ", " + 
-            std::to_string(part.pz()) + ") GeV");
-
-        // Create track with all parameters
-        Track params(
-            part.xProd() * 0.1,  // x position
-            part.px(),           // px
-            part.yProd() * 0.1,  // y position
-            part.py(),           // py
-            part.zProd() * 0.1,  // z position
-            part.pz(),           // pz
-            std::copysign(std::sqrt(part.xProd() * part.xProd() + 
-                                   part.yProd() * part.yProd()), 
-                         part.yProd()) * 0.1,  // dxy
-            part.zProd() * 0.1,  // dz
-            part.charge()         // charge
+    // New method to smear primary vertex
+    TVector3 smearPrimaryVertex(const TVector3& trueVertex) {
+        return TVector3(
+            random.Gaus(trueVertex.X(), kVtxXYRes),
+            random.Gaus(trueVertex.Y(), kVtxXYRes),
+            random.Gaus(trueVertex.Z(), kVtxZRes)
         );
-
-        // Apply DCA smearing
-        smearDCA(part, params, SmearingMethod::PT_DEPENDENT);
-
-        log(debugLevel, DebugLevel::DEBUG, "Created track with parameters:");
-        log(debugLevel, DebugLevel::DEBUG, "Position: (" + 
-            std::to_string(params.pos.X()) + ", " + 
-            std::to_string(params.pos.Y()) + ", " + 
-            std::to_string(params.pos.Z()) + ") cm");
-        log(debugLevel, DebugLevel::DEBUG, "Momentum: (" + 
-            std::to_string(params.mom.X()) + ", " + 
-            std::to_string(params.mom.Y()) + ", " + 
-            std::to_string(params.mom.Z()) + ") GeV");
-        log(debugLevel, DebugLevel::DEBUG, "Impact parameters: dxy = " + 
-            std::to_string(params.dxy) + " cm, dz = " + 
-            std::to_string(params.dz) + " cm");
-
-        return params;
     }
 
-    void smearPrimaryVertex(TVector3 &primaryVtx)
+    // Function to smear pT based on ALICE ITS resolution
+    double smear_pT(double pT);
+
+    void smearDCA(const Pythia8::Particle &parttobesmeared, Track &smearedTrack, const TVector3 &primaryVertex, SmearingMethod method);
+
+    void smearTrack(const Pythia8::Particle &part, Track &params, const TVector3 &primaryVertex)
     {
-        primaryVtx.SetX(random.Gaus(primaryVtx.X(), spatialResolution * 1e-4));
-        primaryVtx.SetY(random.Gaus(primaryVtx.Y(), spatialResolution * 1e-4));
-        primaryVtx.SetZ(random.Gaus(primaryVtx.Z(), spatialResolution * 1e-4));
+        log(debugLevel, DebugLevel::DEBUG, "Smearing track with parameters:");
+        log(debugLevel, DebugLevel::DEBUG, "Original position: (" + std::to_string(part.xProd() * 0.1) + ", " + std::to_string(part.yProd() * 0.1) + ", " + std::to_string(part.zProd() * 0.1) + ") cm");
+        log(debugLevel, DebugLevel::DEBUG, "Original momentum: (" + std::to_string(part.px()) + ", " + std::to_string(part.py()) + ", " + std::to_string(part.pz()) + ") GeV");
+
+        double smeared_pT = smear_pT(part.pT());
+        double smeared_phi = part.phi() + random.Gaus(0.0, kPhiRes);
+        double smeared_theta = part.theta() + random.Gaus(0.0, kThetaRes);
+
+        TVector3 smearedMom;
+        smearedMom.SetPtThetaPhi(smeared_pT, smeared_theta, smeared_phi);
+        params.setMomentum(smearedMom);
+        params.setCharge(part.charge());
+
+        // Apply DCA smearing
+        smearDCA(part, params, primaryVertex, SmearingMethod::PT_DEPENDENT);
+
+        log(debugLevel, DebugLevel::DEBUG, "Created track with parameters:");
+        log(debugLevel, DebugLevel::DEBUG, "Position: (" + std::to_string(params.pos.X()) + ", " + std::to_string(params.pos.Y()) + ", " + std::to_string(params.pos.Z()) + ") cm");
+        log(debugLevel, DebugLevel::DEBUG, "Momentum: (" + std::to_string(params.mom.X()) + ", " + std::to_string(params.mom.Y()) + ", " + std::to_string(params.mom.Z()) + ") GeV");
+        log(debugLevel, DebugLevel::DEBUG, "Impact parameters: dxy = " + std::to_string(params.getDCAxy()) + " cm, dz = " + std::to_string(params.getDCAz()) + " cm");
     }
 
     ~DetectorSimulation()
@@ -301,6 +331,7 @@ private:
     const double maxRadialDist = 10.0; // cm
     const double maxZDist = 12.0;      // cm
     const double minTrackPt = 0.3;     // GeV/c
+    const double minSVPt = 1.0;        // GeV
     DebugLevel debugLevel;
 
     struct TrackAtVertex
@@ -314,7 +345,7 @@ public:
     struct SecVtxInfo
     {
         TVector3 position;
-        double mass;
+        TLorentzVector momentum;
         double significance;
         int nTracks;
         double chi2;
@@ -351,8 +382,7 @@ public:
             {
                 for (size_t k = j + 1; k < goodTracks.size(); ++k)
                 {
-                    std::vector<Track> trackTriplet = {
-                        goodTracks[i], goodTracks[j], goodTracks[k]};
+                    std::vector<Track> trackTriplet = {goodTracks[i], goodTracks[j], goodTracks[k]};
 
                     SecVtxInfo vtxInfo = findSingleSecondaryVertex(trackTriplet);
 
@@ -400,8 +430,8 @@ private:
 
         for (const auto &track : tracks)
         {
-            double weight = track.mom.Pt(); // Weight by pT
-            vtxPos += track.pos * weight;
+            double weight = track.pt() * track.pt(); // Weight by pT
+            vtxPos += track.getPosition() * weight;
             totalWeight += weight;
         }
         vtxPos *= 1.0 / totalWeight;
@@ -417,13 +447,13 @@ private:
             // Extrapolate tracks to current vertex position
             for (const auto &track : tracks)
             {
-                TVector3 diff = vtxPos - track.pos;
+                TVector3 diff = vtxPos - track.getPosition();
                 if (diff.Mag() > maxDCA)
                     continue;
 
                 TrackAtVertex trkVtx;
-                trkVtx.pos = track.pos;
-                trkVtx.mom = track.mom;
+                trkVtx.pos = track.getPosition();
+                trkVtx.mom = track.getMomentum();
                 trkVtx.weight = 1.0 / (diff.Mag2() + 0.01); // Weight by distance
 
                 tracksAtVtx.push_back(trkVtx);
@@ -460,16 +490,16 @@ private:
         TLorentzVector vtxMom;
         for (const auto &track : tracks)
         {
-            if ((track.pos - vtxPos).Mag() < maxDCA)
+            if ((track.getPosition() - vtxPos).Mag() < maxDCA)
             {
                 vtxInfo.nTracks++;
                 TLorentzVector p;
-                p.SetXYZM(track.mom.X(), track.mom.Y(), track.mom.Z(), 0.139); // pion mass
+                p.SetXYZM(track.getMomentum().X(), track.getMomentum().Y(), track.getMomentum().Z(), 0.139); // pion mass
                 vtxMom += p;
             }
         }
 
-        vtxInfo.mass = vtxMom.M();
+        vtxInfo.momentum = vtxMom;
         vtxInfo.significance = vtxPos.Perp() / sqrt(prevChi2);
 
         return vtxInfo;
@@ -481,7 +511,7 @@ private:
         double chi2 = 0;
         for (const auto &track : tracks)
         {
-            TVector3 diff = track.pos - vtxPos;
+            TVector3 diff = track.getPosition() - vtxPos;
             // Simplified chi2 calculation
             chi2 += diff.Mag2();
         }
@@ -500,13 +530,17 @@ private:
         if (std::abs(vtx.position.Z()) >= maxZDist)
             return false;
 
+        // Check SV pT
+        if (vtx.momentum.Pt() < minSVPt)
+            return false;
+
         return true;
     }
 
     bool passesTrackCuts(const Track &track)
     {
         // Check track pT
-        if (track.mom.Pt() <= minTrackPt)
+        if (track.pt() <= minTrackPt)
             return false;
 
         return true;
@@ -601,7 +635,7 @@ public:
         TVector3 vtxPos(0., 0., 0.);
         for (const auto &track : tracks)
         {
-            vtxPos += track.pos;
+            vtxPos += track.getPosition();
         }
         vtxPos *= (1.0 / tracks.size());
 
@@ -620,7 +654,7 @@ public:
             for (auto &track : tracks)
             {
                 // Calculate chi2 distance to current vertex estimate
-                TVector3 diff = track.pos - vtxPos;
+                TVector3 diff = track.getPosition() - vtxPos;
 
                 // Simplified chi2 calculation (you might want to use full covariance matrix)
                 double chi2 = diff.Mag2(); // Simplified - assumes spherical errors
@@ -637,7 +671,7 @@ public:
                 }
 
                 // Update sums
-                newPos += track.pos * weight;
+                newPos += track.getPosition() * weight;
                 weightSum += weight;
             }
 
@@ -671,14 +705,16 @@ public:
 class DCASmearing
 {
 public:
+    DCASmearing(DebugLevel level = DebugLevel::INFO) : debugLevel(level) {}
     static void initializeHistograms();
     static void fillHistograms(const Track &truthPart, const Track &smearedPart);
-    static void setDebugLevel(DebugLevel level) {
+    void setDebugLevel(DebugLevel level)
+    {
         debugLevel = level;
     }
 
 private:
-    static DebugLevel debugLevel;
+    DebugLevel debugLevel;
     static TH1F *hDCAxy_Truth;
     static TH1F *hDCAxy_Smeared;
     static TH1F *hDCAxy_Diff;
@@ -693,8 +729,5 @@ private:
     static TH2F *hDCAz_vs_eta;
 };
 
-// Initialize static member
-DebugLevel DCASmearing::debugLevel = DebugLevel::INFO;
-
 // Add the declaration for convertToTParticle
-TParticle convertToTParticle(const Pythia8::Particle& part);
+TParticle convertToTParticle(const Pythia8::Particle &part);

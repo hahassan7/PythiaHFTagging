@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -O2 -Wall -fPIC -std=c++14 -Wno-deprecated-declarations -D_GLIBCXX_USE_CXX11_ABI=0
+CXXFLAGS = -O2 -Wall -fPIC -std=c++23 -Wno-deprecated-declarations -D_GLIBCXX_USE_CXX11_ABI=0
 
 # ROOT flags and libs
 ROOTCFLAGS    = $(shell root-config --cflags)
@@ -11,7 +11,7 @@ ROOT_LIBDIR   = $(shell root-config --libdir)
 PYTHIA8_INCLUDE = $(PYTHIA8)/include
 PYTHIA8_LIB = $(PYTHIA8)/lib
 PYTHIA8_FLAGS = -I$(PYTHIA8_INCLUDE)
-PYTHIA8_LIBS = -L$(PYTHIA8_LIB) -lpythia8
+PYTHIA8_LIBS = -L$(PYTHIA8_LIB) -Wl,-rpath,$(PYTHIA8_LIB) -lpythia8
 
 # FastJet configuration
 FASTJET_INCLUDE = $(FASTJET)/include

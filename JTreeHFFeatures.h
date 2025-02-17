@@ -7,16 +7,16 @@
 #include <string>
 #include <vector>
 
-template<std::size_t N = 13>
+template <std::size_t N = 10>
 struct HFjetTree
 {
-    float mJetpT;
-    float mJetEta;
-    float mJetPhi;
-    int mNTracks;
-    int mNSV;
-    float mJetMass;
-    int mJetFlavor;
+    float mJetpT = 0.0;
+    float mJetEta = -999;
+    float mJetPhi = -999;
+    int mNTracks = -1;
+    int mNSV = -1;
+    float mJetMass = 0.0;
+    int mJetFlavor = 0;
 
     std::array<float, N> mTrackpT;
     std::array<float, N> mTrackEta;
@@ -98,14 +98,14 @@ enum class HFFeatures : uint8_t
     }
 
 // Macro for array branches
-#define CREATE_BRANCH_HF_ARRAY(FEATURE, BRANCHNAME, TYPE)                                                     \
-    case static_cast<uint8_t>(HFFeatures::FEATURE):                                                           \
-    {                                                                                                         \
-        tree->Branch(BRANCHNAME, data.m##FEATURE.data(), (std::string(BRANCHNAME) + "[13]/" + TYPE).c_str()); \
-        break;                                                                                                \
+#define CREATE_BRANCH_HF_ARRAY(FEATURE, BRANCHNAME, TYPE)                                                                      \
+    case static_cast<uint8_t>(HFFeatures::FEATURE):                                                                            \
+    {                                                                                                                          \
+        tree->Branch(BRANCHNAME, &data.m##FEATURE, (std::string(BRANCHNAME) + "[" + std::to_string(N) + "]/" + TYPE).c_str()); \
+        break;                                                                                                                 \
     }
 
-template<std::size_t N = 13>
+template <std::size_t N = 10>
 class JTreeHFFeatures
 {
 private:
@@ -173,29 +173,29 @@ private:
                 // Track features
                 CREATE_BRANCH_HF_ARRAY(TrackpT, "trackPt", "F")
                 CREATE_BRANCH_HF_ARRAY(TrackEta, "trackEta", "F")
-                CREATE_BRANCH_HF_ARRAY(DotProdTrackJet, "trackDotProduct", "F")
-                CREATE_BRANCH_HF_ARRAY(DotProdTrackJetOverJet, "trackDotProductNorm", "F")
-                CREATE_BRANCH_HF_ARRAY(DeltaRJetTrack, "trackDeltaR", "F")
-                CREATE_BRANCH_HF_ARRAY(SignedIP2D, "trackIP2D", "F")
-                CREATE_BRANCH_HF_ARRAY(SignedIP2DSign, "trackIP2DErr", "F")
-                CREATE_BRANCH_HF_ARRAY(SignedIP3D, "trackIP3D", "F")
-                CREATE_BRANCH_HF_ARRAY(SignedIP3DSign, "trackIP3DErr", "F")
-                CREATE_BRANCH_HF_ARRAY(MomFraction, "trackPtFrac", "F")
-                CREATE_BRANCH_HF_ARRAY(DeltaRTrackVertex, "trackSVDist", "F")
+                CREATE_BRANCH_HF_ARRAY(DotProdTrackJet, "dotProdTrackJet", "F")
+                CREATE_BRANCH_HF_ARRAY(DotProdTrackJetOverJet, "dotProdTrackJetOverJet", "F")
+                CREATE_BRANCH_HF_ARRAY(DeltaRJetTrack, "deltaRJetTrack", "F")
+                CREATE_BRANCH_HF_ARRAY(SignedIP2D, "signedIP2D", "F")
+                CREATE_BRANCH_HF_ARRAY(SignedIP2DSign, "signedIP2DSign", "F")
+                CREATE_BRANCH_HF_ARRAY(SignedIP3D, "signedIP3D", "F")
+                CREATE_BRANCH_HF_ARRAY(SignedIP3DSign, "signedIP3DSign", "F")
+                CREATE_BRANCH_HF_ARRAY(MomFraction, "momFraction", "F")
+                CREATE_BRANCH_HF_ARRAY(DeltaRTrackVertex, "deltaRTrackVertex", "F")
 
                 // SV features
                 CREATE_BRANCH_HF_ARRAY(SVpT, "svPt", "F")
-                CREATE_BRANCH_HF_ARRAY(DeltaRSVJet, "svDeltaR", "F")
+                CREATE_BRANCH_HF_ARRAY(DeltaRSVJet, "deltaRSVJet", "F")
                 CREATE_BRANCH_HF_ARRAY(SVMass, "svMass", "F")
-                CREATE_BRANCH_HF_ARRAY(SVfE, "svEnergyFrac", "F")
-                CREATE_BRANCH_HF_ARRAY(IPxy, "svXYDist", "F")
-                CREATE_BRANCH_HF_ARRAY(CPA, "svCosPA", "F")
+                CREATE_BRANCH_HF_ARRAY(SVfE, "svfE", "F")
+                CREATE_BRANCH_HF_ARRAY(IPxy, "svIPxy", "F")
+                CREATE_BRANCH_HF_ARRAY(CPA, "svCPA", "F")
                 CREATE_BRANCH_HF_ARRAY(Chi2PCA, "svChi2", "F")
                 CREATE_BRANCH_HF_ARRAY(Dispersion, "svDispersion", "F")
-                CREATE_BRANCH_HF_ARRAY(DecayLength2D, "svDecayLen2D", "F")
-                CREATE_BRANCH_HF_ARRAY(DecayLength2DError, "svDecayLen2DErr", "F")
-                CREATE_BRANCH_HF_ARRAY(DecayLength3D, "svDecayLen3D", "F")
-                CREATE_BRANCH_HF_ARRAY(DecayLength3DError, "svDecayLen3DErr", "F")
+                CREATE_BRANCH_HF_ARRAY(DecayLength2D, "svDecayLength2D", "F")
+                CREATE_BRANCH_HF_ARRAY(DecayLength2DError, "svDecayLength2DError", "F")
+                CREATE_BRANCH_HF_ARRAY(DecayLength3D, "svDecayLength3D", "F")
+                CREATE_BRANCH_HF_ARRAY(DecayLength3DError, "svDecayLength3DError", "F")
             }
         }
     }
@@ -244,8 +244,8 @@ public:
     }
 
     // Add these methods to access the data structure
-    HFjetTree<N>& getData() { return data; }
-    const HFjetTree<N>& getData() const { return data; }
+    HFjetTree<N> &getData() { return data; }
+    const HFjetTree<N> &getData() const { return data; }
 };
 
 #undef FILL_MAP_HF

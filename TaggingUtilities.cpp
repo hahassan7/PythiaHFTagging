@@ -60,7 +60,6 @@ void DetectorSimulation::smearDCA(const Pythia8::Particle &parttobesmeared, Trac
     double zProd = parttobesmeared.zProd() * 0.1;
     double pT = parttobesmeared.pT();
     double eta = parttobesmeared.eta();
-    double phi = parttobesmeared.phi();
 
     double etaFactor = 1.0 + 0.1 * std::abs(eta);
 
@@ -69,7 +68,8 @@ void DetectorSimulation::smearDCA(const Pythia8::Particle &parttobesmeared, Trac
 
     double sigmaXY, sigmaZ;
 
-    if (pT < 0.1) pT = 0.1;
+    if (pT < 0.1)
+        pT = 0.1;
 
     switch (method)
     {
@@ -96,8 +96,8 @@ void DetectorSimulation::smearDCA(const Pythia8::Particle &parttobesmeared, Trac
         sigmaXY = 0.0010; // 10 μm -> cm
         sigmaZ = 0.0010;  // 10 μm -> cm
 
-        smearedTrack.setDCAxy(random.Gaus(std::copysign(std::sqrt(xProd * xProd + yProd * yProd), yProd), sigmaXY));
-        smearedTrack.setDCAz(random.Gaus(zProd, sigmaZ));
+        smearedTrack.setDCAxy(random.Gaus(trueXYdca, sigmaXY));
+        smearedTrack.setDCAz(random.Gaus(trueZdca, sigmaZ));
 
         smearedTrack.setPosition(smearPrimaryVertex(TVector3(xProd, yProd, zProd)));
         break;
@@ -106,7 +106,7 @@ void DetectorSimulation::smearDCA(const Pythia8::Particle &parttobesmeared, Trac
     default:
         smearedTrack.setDCAxy(trueXYdca);
         smearedTrack.setDCAz(trueZdca);
-        // smearedTrack.setPosition(TVector3(xProd, yProd, zProd));
+        smearedTrack.setPosition(TVector3(xProd, yProd, zProd));
         break;
     }
 }
@@ -176,63 +176,3 @@ void DCASmearing::fillHistograms(const Track &truthPart, const Track &smearedPar
     hDCAxy_vs_eta->Fill(eta, smearedPart.getDCAxy());
     hDCAz_vs_eta->Fill(eta, smearedPart.getDCAz());
 }
-/*
-
-    void smearTrack(const Pythia8::Particle &part, Track &trackParams)
-    {
-        try
-        {
-            double pT = part.pT();
-            double eta = part.eta();
-            double phi = part.phi();
-
-            if (pT < 0.1)
-                pT = 0.1;
-
-            // Calculate resolutions
-            double sigmaXY = std::sqrt(std::pow(kDCAxyOffset, 2) + std::pow(kDCAxySlope, 2) / (pT * pT));
-            double sigmaZ = std::sqrt(std::pow(kDCAzOffset, 2) + std::pow(kDCAzSlope, 2) / (pT * pT));
-
-            double etaFactor = 1.0 + 0.1 * std::abs(eta);
-            sigmaXY *= etaFactor;
-            sigmaZ *= etaFactor;
-
-            // Get true production vertex (in cm)
-            double xProd = part.xProd() * 0.1;
-            double yProd = part.yProd() * 0.1;
-            double zProd = part.zProd() * 0.1;
-
-            // Calculate true DCA (distance from production vertex to origin in XY plane and Z)
-            double trueXYdca = std::sqrt(xProd * xProd + yProd * yProd);
-            double trueZdca = zProd;
-
-            // Smear DCA
-            trackParams.setDCAxy(random.Gaus(trueXYdca, sigmaXY));
-            trackParams.setDCAz(random.Gaus(trueZdca, sigmaZ));
-
-            // Smear momentum
-            double sigma_pT_over_pT = std::sqrt(kPtResA * kPtResA + (kPtResB * kPtResB) / (pT * pT) + (kPtResC * pT) * (kPtResC * pT));
-
-            double smeared_pT = pT * (1.0 + random.Gaus(0.0, sigma_pT_over_pT));
-            double smeared_phi = phi + random.Gaus(0.0, kPhiRes);
-            double smeared_theta = part.theta() + random.Gaus(0.0, kThetaRes);
-
-            TVector3 smearedMom;
-            smearedMom.SetPtThetaPhi(smeared_pT, smeared_theta, smeared_phi);
-            trackParams.setMomentum(smearedMom);
-            trackParams.setCharge(part.charge());
-
-            // Smear the position around the true production vertex
-            TVector3 smearedPos(random.Gaus(xProd, kVtxXYRes), random.Gaus(yProd, kVtxXYRes), random.Gaus(zProd, kVtxZRes));
-            trackParams.setPosition(smearedPos);
-        }
-        catch (const std::exception &e)
-        {
-            std::cerr << "Exception in smearTrack: " << e.what() << std::endl;
-            trackParams.setPosition(TVector3(0, 0, 0));
-            trackParams.setMomentum(TVector3(0, 0, 0));
-            trackParams.setDCAxy(0);
-            trackParams.setDCAz(0);
-            trackParams.setCharge(0);
-        }
-*/

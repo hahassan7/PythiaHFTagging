@@ -106,6 +106,7 @@ private:
     double dcaXY;
     double dcaZ;
     double charge;
+    int index;
 
 public:
     // Constructors
@@ -153,6 +154,7 @@ public:
     double getDCAxy() const { return dcaXY; }
     double getDCAz() const { return dcaZ; }
     double getCharge() const { return charge; }
+    int getIndex() const { return index; }
 
     // Setters
     void setPosition(const TVector3 &p) { pos = p; }
@@ -160,6 +162,7 @@ public:
     void setDCAxy(double dxy) { dcaXY = dxy; }
     void setDCAz(double dz) { dcaZ = dz; }
     void setCharge(double q) { charge = q; }
+    void setIndex(int idx) { index = idx; }
 
     // Utility functions
     double pt() const { return mom.Pt(); }
@@ -201,6 +204,29 @@ float deltaR(T const &A, U const &B)
         dEta = A.eta() - B.eta();
     }
     return std::sqrt(dEta * dEta + dPhi * dPhi);
+}
+
+/**
+ * return geometric sign which is calculated scalar product between jet axis with DCA (track propagated to PV )
+ * positive and negative value are expected from primary vertex
+ * positive value is expected from secondary vertex
+ *
+ * @param jet
+ * @param track which is needed aod::JTrackExtras
+ */
+template <typename T>
+int getGeoSign(T const &jet, Track const &track, TVector3 const &pVertex,
+               DebugLevel debugLevel = DebugLevel::INFO)
+{
+    double posX = track.getPosition().X() - pVertex.X();
+    double posY = track.getPosition().Y() - pVertex.Y();
+    double posZ = track.getDCAz();
+
+    auto sign = TMath::Sign(1, posX * jet.px() + posY * jet.py() + posZ * jet.pz());
+    if (sign < -1 || sign > 1)
+        log(debugLevel, DebugLevel::INFO, Form("Sign is %d", sign));
+
+    return sign;
 }
 
 // Update getJetFlavor template function to include debug level
@@ -278,12 +304,12 @@ public:
         : random(0), debugLevel(level) {} // Initialize with seed 0 for reproducibility
 
     // New method to smear primary vertex
-    TVector3 smearPrimaryVertex(const TVector3& trueVertex) {
+    TVector3 smearPrimaryVertex(const TVector3 &trueVertex)
+    {
         return TVector3(
             random.Gaus(trueVertex.X(), kVtxXYRes),
             random.Gaus(trueVertex.Y(), kVtxXYRes),
-            random.Gaus(trueVertex.Z(), kVtxZRes)
-        );
+            random.Gaus(trueVertex.Z(), kVtxZRes));
     }
 
     // Function to smear pT based on ALICE ITS resolution
@@ -349,6 +375,7 @@ public:
         double significance;
         int nTracks;
         double chi2;
+        std::vector<int> indices;
     };
 
     SecondaryVertexFinder(DebugLevel level = DebugLevel::INFO) : debugLevel(level) {}
@@ -501,6 +528,12 @@ private:
 
         vtxInfo.momentum = vtxMom;
         vtxInfo.significance = vtxPos.Perp() / sqrt(prevChi2);
+        vtxInfo.indices = std::vector<int>{};
+
+        for (const auto &track : tracks)
+        {
+            vtxInfo.indices.push_back(track.getIndex());
+        }
 
         return vtxInfo;
     }
@@ -597,18 +630,41 @@ struct SVCalculations
         return flightLine.Unit().Dot(svMomentum.Unit());
     }
 
-    static double calculateDispersion(const std::vector<TVector3> &trackPositions, const TVector3 &svPosition)
+    /// Calculates impact parameter in the bending plane of the particle w.r.t. a point
+    /// \param point  position of the point
+    /// \param posSV  position of the secondary vertex
+    /// \param mom  particle momentum array
+    /// \return impact parameter in {x, y}
+    static double calculateIPxy(const TVector3 &point, const TVector3 &posSV, const TVector3 &mom)
     {
-        if (trackPositions.empty())
+        TVector2 flightLineXY = posSV.XYvector() - point.XYvector();
+        auto k = (flightLineXY.X() * mom.X() + flightLineXY.Y() * mom.Y()) / (mom.X() * mom.X() + mom.Y() * mom.Y());
+        auto dx = flightLineXY.X() - k * static_cast<double>(mom.X());
+        auto dy = flightLineXY.Y() - k * static_cast<double>(mom.Y());
+        auto absImpPar = std::sqrt(dx * dx + dy * dy);
+        auto flightLine = posSV - point;
+        auto cross = mom.Cross(flightLine);
+        return (cross.Z() > 0. ? absImpPar : -1. * absImpPar);
+    }
+
+    static double calculateDispersion(const SecondaryVertexFinder::SecVtxInfo &vtxInfo, const std::vector<Track> allTracks)
+    {
+        if (vtxInfo.indices.empty())
             return 0.0;
 
-        double sumDistanceSquared = 0.0;
-        for (const auto &trackPos : trackPositions)
+        std::vector<Track> prongs;
+        for (const auto &indx : vtxInfo.indices)
         {
-            TVector3 diff = trackPos - svPosition;
+            prongs.push_back(allTracks[indx]);
+        }
+
+        double sumDistanceSquared = 0.0;
+        for (const auto &prong : prongs)
+        {
+            TVector3 diff = prong.getPosition() - vtxInfo.position;
             sumDistanceSquared += diff.Mag2();
         }
-        return std::sqrt(sumDistanceSquared / trackPositions.size());
+        return std::sqrt(sumDistanceSquared / prongs.size());
     }
 };
 

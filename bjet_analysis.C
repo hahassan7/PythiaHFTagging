@@ -1,4 +1,4 @@
-#include "TaggingUtilities.h"
+#include "TaggingUtilities.cpp"
 #include "JTreeHFFeatures.h"
 #include "JetTreeGenerator.h"
 
@@ -565,11 +565,24 @@ public:
     }
 };
 
+void bjet_analysis(int nEvents = 10000, double pTHatMin = 20, double pTHatMax = -1, DebugLevel debugLevel = DebugLevel::INFO){
+
+    // Initialize features
+    std::vector<std::string> features = {"JetpT", "JetEta", "JetPhi", "JetMass", "NTracks", "NSV", "JetFlavor",
+                                         "TrackpT", "TrackEta", "DotProdTrackJet", "DotProdTrackJetOverJet", "DeltaRJetTrack", "SignedIP2D", "SignedIP3D",
+                                         "MomFraction", "DeltaRTrackVertex",
+                                         "SVpT", "DeltaRSVJet", "SVMass", "SVfE", "IPxy", "CPA", "Chi2PCA",
+                                         "Dispersion", "DecayLength2D", "DecayLength3D"};
+
+    BjetAnalysis bjetAnalysis(features, debugLevel);
+    bjetAnalysis.analyze(nEvents, pTHatMin, pTHatMax);
+}
+
 // Update main to accept number of events
 int main(int argc, char *argv[])
 {
     int nEvents = 10000; // default value
-    double pTHatmin = 20;
+    double pTHatMin = 20;
     double pTHatMax = -1;
     DebugLevel debugLevel = DebugLevel::INFO;
 
@@ -604,7 +617,7 @@ int main(int argc, char *argv[])
         {
             if (i + 1 < argc)
             {
-                pTHatmin = std::atoi(argv[++i]);
+                pTHatMin = std::atoi(argv[++i]);
             }
         }
         else if (arg == "-pmax" || arg == "--pTHatMax")
@@ -627,14 +640,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Initialize features
-    std::vector<std::string> features = {"JetpT", "JetEta", "JetPhi", "JetMass", "NTracks", "NSV", "JetFlavor",
-                                         "TrackpT", "TrackEta", "DotProdTrackJet", "DotProdTrackJetOverJet", "DeltaRJetTrack", "SignedIP2D", "SignedIP3D",
-                                         "MomFraction", "DeltaRTrackVertex",
-                                         "SVpT", "DeltaRSVJet", "SVMass", "SVfE", "IPxy", "CPA", "Chi2PCA",
-                                         "Dispersion", "DecayLength2D", "DecayLength3D"};
-
-    BjetAnalysis bjetAnalysis(features, debugLevel);
-    bjetAnalysis.analyze(nEvents, pTHatmin, pTHatMax);
+    bjet_analysis(nEvents, pTHatMin, pTHatMax, debugLevel);
     return 0;
 }

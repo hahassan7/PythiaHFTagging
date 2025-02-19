@@ -19,7 +19,7 @@ public:
     {
     }
 
-    void analyze(int nEvents = 10000)
+    void analyze(int nEvents = 10000, double pTHatmin = 20, double pTHatmax = -1)
     {
         auto logLocal = [this](DebugLevel level, const std::string &message)
         {
@@ -119,8 +119,9 @@ public:
         pythia.readString("Beams:sigmaVertexZ = 50"); // Back to mm (= 5 cm)
         logLocal(DebugLevel::DEBUG, "Set vertex spread parameters");
 
-        pythia.readString("HardQCD:all = on");          // Turn on hard QCD processes
-        pythia.readString("PhaseSpace:pTHatMin = 20."); // Min pT for hard interaction
+        pythia.readString("HardQCD:all = on");                           // Turn on hard QCD processes
+        pythia.readString(Form("PhaseSpace:pTHatMin = %.1f", pTHatmin)); // Min pT for hard interaction
+        pythia.readString(Form("PhaseSpace:pTHatMax = %.1f", pTHatmax)); // Max pT for hard interaction
         logLocal(DebugLevel::DEBUG, "Set physics process parameters");
 
         if (!pythia.init())
@@ -568,6 +569,8 @@ public:
 int main(int argc, char *argv[])
 {
     int nEvents = 10000; // default value
+    double pTHatmin = 20;
+    double pTHatMax = -1;
     DebugLevel debugLevel = DebugLevel::INFO;
 
     // Parse command line arguments
@@ -597,13 +600,29 @@ int main(int argc, char *argv[])
                 }
             }
         }
+        else if (arg == "-pmin" || arg == "--pTHatMin")
+        {
+            if (i + 1 < argc)
+            {
+                pTHatmin = std::atoi(argv[++i]);
+            }
+        }
+        else if (arg == "-pmax" || arg == "--pTHatMax")
+        {
+            if (i + 1 < argc)
+            {
+                pTHatMax = std::atoi(argv[++i]);
+            }
+        }
         else if (arg == "-h" || arg == "--help")
         {
             std::cout << "Usage: " << argv[0] << " [options]\n"
                       << "Options:\n"
-                      << "  -n, --nevents N    Number of events to process (default: 10000)\n"
-                      << "  -d, --debug N      Debug level (0-5, default: 3)\n"
-                      << "  -h, --help         Show this help message\n";
+                      << "  -n, --nevents N           Number of events to process (default: 10000)\n"
+                      << "  -d, --debug N             Debug level (0-5, default: 3)\n"
+                      << "  -pmin, --pTHatMin pt      Min pT of the hard scattering\n"
+                      << "  -pmax, --pTHatMax pt      Max pT of the hard scattering\n"
+                      << "  -h, --help                Show this help message\n";
             return 0;
         }
     }
@@ -616,6 +635,6 @@ int main(int argc, char *argv[])
                                          "Dispersion", "DecayLength2D", "DecayLength3D"};
 
     BjetAnalysis bjetAnalysis(features, debugLevel);
-    bjetAnalysis.analyze(nEvents);
+    bjetAnalysis.analyze(nEvents, pTHatmin, pTHatMax);
     return 0;
 }

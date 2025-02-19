@@ -11,8 +11,8 @@ template <std::size_t N = 10>
 struct HFjetTree
 {
     float mJetpT = 0.0;
-    float mJetEta = -999;
-    float mJetPhi = -999;
+    float mJetEta = -99;
+    float mJetPhi = -99;
     int mNTracks = -1;
     int mNSV = -1;
     float mJetMass = 0.0;
@@ -42,6 +42,21 @@ struct HFjetTree
     std::array<float, N> mDecayLength2DError;
     std::array<float, N> mDecayLength3D;
     std::array<float, N> mDecayLength3DError;
+
+    // Constructor to initialize arrays with -999
+    HFjetTree() {
+        mSignedIP2D.fill(-999);
+        mSignedIP2DSign.fill(-999);
+        mSignedIP3D.fill(-999);
+        mSignedIP3DSign.fill(-999);
+
+        mIPxy.fill(-999);
+        mCPA.fill(-999);
+        mChi2PCA.fill(999);
+        mDispersion.fill(999);
+        mDecayLength2D.fill(-999);
+        mDecayLength3D.fill(-999);
+    }
 };
 
 enum class HFFeatures : uint8_t

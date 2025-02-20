@@ -1,59 +1,79 @@
+# Compiler and flags
 CXX = g++
-CXXFLAGS = -O2 -Wall -fPIC -std=c++23 -Wno-deprecated-declarations -D_GLIBCXX_USE_CXX11_ABI=0
+CXXFLAGS = -O2 -Wall -fPIC -std=c++17 -Wno-deprecated-declarations -D_GLIBCXX_USE_CXX11_ABI=0
 
-# ROOT flags and libs
-ROOTCFLAGS    = $(shell root-config --cflags)
-ROOTLIBS      = $(shell root-config --libs)
-ROOTGLIBS     = $(shell root-config --glibs)
-ROOT_LIBDIR   = $(shell root-config --libdir)
+# ROOT configuration (using root-config directly)
+ROOT_INCDIR = $(shell root-config --incdir)
+ROOT_LIBDIR = $(shell root-config --libdir)
+ROOT_CFLAGS = $(shell root-config --cflags)
+ROOT_LIBS = $(shell root-config --libs)
+ROOT_GLIBS = $(shell root-config --glibs)
 
 # Pythia8 configuration
-PYTHIA8_INCLUDE = $(PYTHIA8)/include
-PYTHIA8_LIB = $(PYTHIA8)/lib
-PYTHIA8_FLAGS = -I$(PYTHIA8_INCLUDE)
-PYTHIA8_LIBS = -L$(PYTHIA8_LIB) -Wl,-rpath,$(PYTHIA8_LIB) -lpythia8
+PYTHIA8_DIR = $(shell pythia8-config --prefix)
+PYTHIA8_INCLUDE = -I$(PYTHIA8_DIR)/include
+PYTHIA8_LIBS = -L$(PYTHIA8_DIR)/lib -lpythia8
 
 # FastJet configuration
-FASTJET_INCLUDE = $(FASTJET)/include
-FASTJET_LIB = $(FASTJET)/lib
-FASTJET_FLAGS = -I$(FASTJET_INCLUDE)
-FASTJET_LIBS = -L$(FASTJET_LIB) -lfastjet
+FASTJET_DIR = $(shell fastjet-config --prefix)
+FASTJET_INCLUDE = -I$(FASTJET_DIR)/include
+FASTJET_LIBS = -L$(FASTJET_DIR)/lib -lfastjettools -lfastjet
 
-# Additional flags for FastJet compatibility
-EXTRA_FLAGS = -D_BACKWARD_BACKWARD_WARNING_H -I.
+# Combined flags
+ALL_INCLUDES = -I. $(ROOT_CFLAGS) $(PYTHIA8_INCLUDE) $(FASTJET_INCLUDE)
+ALL_LIBS = $(ROOT_GLIBS) $(PYTHIA8_LIBS) $(FASTJET_LIBS) -pthread -rdynamic
 
-# Combine all flags
-ALL_FLAGS = $(CXXFLAGS) $(ROOTCFLAGS) $(PYTHIA8_FLAGS) $(FASTJET_FLAGS) $(EXTRA_FLAGS)
-LIBS = $(ROOTLIBS) $(PYTHIA8_LIBS) $(FASTJET_LIBS)
+# Target executable
+TARGET = bjet_analysis
 
-# Source files and targets
-LIB_SRCS = TaggingUtilities.cpp
-LIB_OBJS = $(LIB_SRCS:.cpp=.o)
-LIB_TARGET = libTaggingUtilities.so
+# Object files
+OBJECTS = bjet_analysis.o TaggingUtilities.o
 
-# bjet_analysis targets
-ANALYSIS_TARGET = bjet_analysis
-ANALYSIS_SRCS = bjet_analysis.C
+# Default target
+all: $(TARGET)
 
-# Add rpath for dynamic libraries (removing duplicates)
-UNIQUE_RPATHS = $(sort $(PYTHIA8_LIB) $(FASTJET_LIB) $(ROOT_LIBDIR) .)
-RPATH = $(addprefix -Wl,-rpath,$(UNIQUE_RPATHS))
+# Main target
+$(TARGET): $(OBJECTS)
+	$(CXX) $(CXXFLAGS) $(ALL_INCLUDES) $(OBJECTS) -o $@ $(ALL_LIBS)
 
-all: $(LIB_TARGET) $(ANALYSIS_TARGET)
+# Explicit compilation rules for each source file
+bjet_analysis.o: bjet_analysis.cpp
+	$(CXX) $(CXXFLAGS) $(ALL_INCLUDES) -c $< -o $@
 
-$(LIB_TARGET): $(LIB_OBJS)
-	$(CXX) -shared -o $@ $(LIB_OBJS) $(LIBS) $(RPATH)
+TaggingUtilities.o: TaggingUtilities.cpp
+	$(CXX) $(CXXFLAGS) $(ALL_INCLUDES) -c $< -o $@
 
-$(ANALYSIS_TARGET): $(ANALYSIS_SRCS) $(LIB_TARGET)
-	$(CXX) $(ALL_FLAGS) -o $@ $(ANALYSIS_SRCS) -L. -lTaggingUtilities $(LIBS) $(RPATH) -DSTANDALONE_MODE
-
-%.o: %.cpp
-	$(CXX) $(ALL_FLAGS) -c $< -o $@
-
+# Clean (excluding source files)
 clean:
-	rm -f $(LIB_TARGET) $(ANALYSIS_TARGET)
-	rm -f *.o
-	rm -f *~
-	rm -f *.d
+	rm -f $(TARGET) *.o *~ *.d
+	@echo "Cleaning object files and executable (preserving source files)"
 
-.PHONY: all clean
+# Very clean (including generated data)
+distclean: clean
+	rm -f *.log
+	rm -f *.pdf
+	rm -f *.eps
+
+# Run the analysis
+run: $(TARGET)
+	./$(TARGET)
+
+# Debug build
+debug: CXXFLAGS += -g -DDEBUG
+debug: clean $(TARGET)
+
+# Help target
+help:
+	@echo "Available targets for Pythia Lambda_c analysis:"
+	@echo "  all              - Build the executable"
+	@echo "  clean            - Remove object files and executable"
+	@echo "  distclean        - Remove all generated files"
+	@echo "  run              - Run the analysis"
+	@echo "  debug            - Build with debug symbols"
+	@echo "  help             - Show this help message"
+
+# Dependencies
+pythia_lambda_c.o: pythia_lambda_c.cpp
+LambdaCGenerator.o: LambdaCGenerator.h
+
+.PHONY: all clean distclean run debug help

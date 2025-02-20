@@ -1,4 +1,4 @@
-#include "TaggingUtilities.cpp"
+#include "TaggingUtilities.h"
 #include "JTreeHFFeatures.h"
 #include "JetTreeGenerator.h"
 

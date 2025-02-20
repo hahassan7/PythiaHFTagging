@@ -63,7 +63,7 @@ public:
         for (size_t iTrack = 0; iTrack < constituents.size(); ++iTrack)
         {
             size_t trackIndex = constituents[iTrack].user_index();
-            if (trackIndex >= 0 && trackIndex < allTracks.size())
+            if (trackIndex < allTracks.size())
             {
                 sortedTracks.push_back(allTracks[trackIndex]); // Add track to the sorted list
             }

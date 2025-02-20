@@ -396,7 +396,7 @@ public:
                         for (const auto &constituent : constituents)
                         {
                             size_t trackIndex = constituent.user_index();
-                            if (trackIndex >= 0 && trackIndex < allTracks.size())
+                            if (trackIndex < allTracks.size())
                             {
                                 jetTracks.push_back(allTracks[trackIndex]);
                             }

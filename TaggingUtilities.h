@@ -1,7 +1,7 @@
 #pragma once
 
 // Include FastJet compatibility layer first
-#include "FastJetCompat.h"
+//#include "FastJetCompat.h"
 
 // First include system headers
 #include <vector>
@@ -109,11 +109,12 @@ private:
     int index;
 
 public:
-    // Constructors
-    Track() : pos(TVector3()), mom(TVector3()), dcaXY(0), dcaZ(0), charge(0) {}
+    // Default constructor - initialize everything
+    Track() : pos(TVector3()), mom(TVector3()), dcaXY(0), dcaZ(0), charge(0), index(-1) {}
 
+    // Main constructor
     Track(const TVector3 &p, const TVector3 &m, double dxy = 0, double dz = 0, double q = 0)
-        : pos(p), mom(m), dcaXY(dxy), dcaZ(dz), charge(q)
+        : pos(p), mom(m), dcaXY(dxy), dcaZ(dz), charge(q), index(-1)  // Initialize index
     {
         // Validate inputs
         if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z()))
@@ -130,22 +131,43 @@ public:
         }
     }
 
+    // Copy constructor
     Track(const Track &other)
-        : pos(other.pos), mom(other.mom), dcaXY(other.dcaXY), dcaZ(other.dcaZ), charge(other.charge)
+        : pos(other.pos), 
+          mom(other.mom), 
+          dcaXY(other.dcaXY), 
+          dcaZ(other.dcaZ), 
+          charge(other.charge),
+          index(other.index)  // Copy the index
     {
-        // Validate inputs
+        // Validate copied data
         if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z()))
         {
-            throw std::runtime_error("Invalid position in Track constructor");
+            throw std::runtime_error("Invalid position in Track copy constructor");
         }
         if (std::isnan(mom.X()) || std::isnan(mom.Y()) || std::isnan(mom.Z()))
         {
-            throw std::runtime_error("Invalid momentum in Track constructor");
+            throw std::runtime_error("Invalid momentum in Track copy constructor");
         }
         if (std::isnan(dcaXY) || std::isnan(dcaZ) || std::isnan(charge))
         {
-            throw std::runtime_error("Invalid impact parameters or charge in Track constructor");
+            throw std::runtime_error("Invalid impact parameters or charge in Track copy constructor");
         }
+    }
+
+    // Assignment operator
+    Track& operator=(const Track &other)
+    {
+        if (this != &other)
+        {
+            pos = other.pos;
+            mom = other.mom;
+            dcaXY = other.dcaXY;
+            dcaZ = other.dcaZ;
+            charge = other.charge;
+            index = other.index;  // Copy the index
+        }
+        return *this;
     }
 
     // Getters
@@ -162,7 +184,14 @@ public:
     void setDCAxy(double dxy) { dcaXY = dxy; }
     void setDCAz(double dz) { dcaZ = dz; }
     void setCharge(double q) { charge = q; }
-    void setIndex(int idx) { index = idx; }
+    void setIndex(int idx) 
+    { 
+        if (idx < 0)
+        {
+            throw std::invalid_argument("Track index cannot be negative");
+        }
+        index = idx; 
+    }
 
     // Utility functions
     double pt() const { return mom.Pt(); }
@@ -372,10 +401,18 @@ public:
     {
         TVector3 position;
         TLorentzVector momentum;
-        double significance;
-        int nTracks;
-        double chi2;
-        std::vector<int> indices;
+        double significance = 0.0;
+        int nTracks = 0;
+        double chi2 = 0.0;
+        std::vector<size_t> indices;
+
+        SecVtxInfo() : 
+            position(0,0,0),
+            momentum(0,0,0,0),
+            significance(0),
+            nTracks(0),
+            chi2(0),
+            indices() {}
     };
 
     SecondaryVertexFinder(DebugLevel level = DebugLevel::INFO) : debugLevel(level) {}
@@ -528,7 +565,7 @@ private:
 
         vtxInfo.momentum = vtxMom;
         vtxInfo.significance = vtxPos.Perp() / sqrt(prevChi2);
-        vtxInfo.indices = std::vector<int>{};
+        vtxInfo.indices = std::vector<size_t>{};
 
         for (const auto &track : tracks)
         {
@@ -647,23 +684,61 @@ struct SVCalculations
         return (cross.Z() > 0. ? absImpPar : -1. * absImpPar);
     }
 
-    static double calculateDispersion(const SecondaryVertexFinder::SecVtxInfo &vtxInfo, const std::vector<Track> allTracks)
+    static double calculateDispersion(const SecondaryVertexFinder::SecVtxInfo &vtxInfo, 
+                                    const std::vector<Track> &allTracks,
+                                    DebugLevel debugLevel = DebugLevel::INFO)
     {
         if (vtxInfo.indices.empty())
+        {
+            log(debugLevel, DebugLevel::DEBUG, "No indices in vtxInfo");
             return 0.0;
+        }
+
+        // Validate all indices before processing
+        for (const auto idx : vtxInfo.indices)
+        {
+            if (idx >= allTracks.size())
+            {
+                log(debugLevel, DebugLevel::ERROR,
+                    "Invalid track index found: " + std::to_string(idx) + 
+                    " (valid range: 0 to " + std::to_string(allTracks.size() - 1) + ")");
+                return 0.0;
+            }
+        }
 
         std::vector<Track> prongs;
-        for (const auto &indx : vtxInfo.indices)
+        for (const auto &idx : vtxInfo.indices)
         {
-            prongs.push_back(allTracks[indx]);
+            try {
+                prongs.push_back(allTracks[idx]);
+                log(debugLevel, DebugLevel::VERBOSE,
+                    "Added track " + std::to_string(idx));
+            } catch (const std::exception& e) {
+                log(debugLevel, DebugLevel::ERROR,
+                    "Error copying track: " + std::string(e.what()));
+                return 0.0;
+            }
+        }
+
+        if (prongs.empty())
+        {
+            log(debugLevel, DebugLevel::DEBUG, "No valid prongs found");
+            return 0.0;
         }
 
         double sumDistanceSquared = 0.0;
         for (const auto &prong : prongs)
         {
             TVector3 diff = prong.getPosition() - vtxInfo.position;
+            if (std::isnan(diff.Mag2()))
+            {
+                log(debugLevel, DebugLevel::WARNING, 
+                    "Invalid distance calculation in dispersion");
+                continue;
+            }
             sumDistanceSquared += diff.Mag2();
         }
+
         return std::sqrt(sumDistanceSquared / prongs.size());
     }
 };

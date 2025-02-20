@@ -1,10 +1,8 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -O2 -Wall -fPIC -std=c++17 -Wno-deprecated-declarations -D_GLIBCXX_USE_CXX11_ABI=0
+CXXFLAGS = -Wall -Wextra -O2 -std=c++17 -g
 
-# ROOT configuration (using root-config directly)
-ROOT_INCDIR = $(shell root-config --incdir)
-ROOT_LIBDIR = $(shell root-config --libdir)
+# ROOT configuration
 ROOT_CFLAGS = $(shell root-config --cflags)
 ROOT_LIBS = $(shell root-config --libs)
 ROOT_GLIBS = $(shell root-config --glibs)
@@ -14,14 +12,14 @@ PYTHIA8_DIR = $(shell pythia8-config --prefix)
 PYTHIA8_INCLUDE = -I$(PYTHIA8_DIR)/include
 PYTHIA8_LIBS = -L$(PYTHIA8_DIR)/lib -lpythia8
 
-# FastJet configuration
-FASTJET_DIR = $(shell fastjet-config --prefix)
-FASTJET_INCLUDE = -I$(FASTJET_DIR)/include
-FASTJET_LIBS = -L$(FASTJET_DIR)/lib -lfastjettools -lfastjet
+# FastJet configuration - use exact output from fastjet-config
+FASTJET_INCLUDE = $(shell fastjet-config --cxxflags)
+FASTJET_LIBS = $(shell fastjet-config --libs)
 
 # Combined flags
 ALL_INCLUDES = -I. $(ROOT_CFLAGS) $(PYTHIA8_INCLUDE) $(FASTJET_INCLUDE)
-ALL_LIBS = $(ROOT_GLIBS) $(PYTHIA8_LIBS) $(FASTJET_LIBS) -pthread -rdynamic
+# Put FastJet first in the linking order
+ALL_LIBS = $(FASTJET_LIBS) $(ROOT_GLIBS) $(PYTHIA8_LIBS) -pthread -rdynamic
 
 # Target executable
 TARGET = bjet_analysis

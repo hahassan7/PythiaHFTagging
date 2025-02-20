@@ -62,7 +62,7 @@ public:
         std::vector<Track> sortedTracks; // Vector to hold sorted tracks
         for (size_t iTrack = 0; iTrack < constituents.size(); ++iTrack)
         {
-            int trackIndex = constituents[iTrack].user_index();
+            size_t trackIndex = constituents[iTrack].user_index();
             if (trackIndex >= 0 && trackIndex < allTracks.size())
             {
                 sortedTracks.push_back(allTracks[trackIndex]); // Add track to the sorted list

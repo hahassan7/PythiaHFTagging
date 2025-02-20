@@ -395,7 +395,7 @@ public:
                         std::vector<Track> jetTracks;
                         for (const auto &constituent : constituents)
                         {
-                            int trackIndex = constituent.user_index();
+                            size_t trackIndex = constituent.user_index();
                             if (trackIndex >= 0 && trackIndex < allTracks.size())
                             {
                                 jetTracks.push_back(allTracks[trackIndex]);

@@ -44,7 +44,8 @@ struct HFjetTree
     std::array<float, N> mDecayLength3DError;
 
     // Constructor to initialize arrays with -999
-    HFjetTree() {
+    HFjetTree()
+    {
         mSignedIP2D.fill(-999);
         mSignedIP2DSign.fill(-999);
         mSignedIP3D.fill(-999);
@@ -240,6 +241,11 @@ public:
     {
         tree->Fill();
         // Reset data structure for next jet
+        data = HFjetTree<N>();
+    }
+
+    void clear()
+    {
         data = HFjetTree<N>();
     }
 

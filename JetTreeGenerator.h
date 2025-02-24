@@ -6,6 +6,7 @@
 #include "TVector2.h"
 #include <memory>
 #include <algorithm>
+#include <random> // Include for random number generation
 
 template <std::size_t N = 10>
 class JetTreeGenerator
@@ -19,6 +20,9 @@ public:
         : mDebugLevel(debugLevel)
     {
         mJetTree = std::make_unique<JTreeHFFeatures<N>>(filename, features);
+
+        // Seed the random number generator using current time
+        std::srand(static_cast<unsigned int>(std::time(nullptr)));
     }
 
     // Comparison function for sorting secondary vertices based on 2D decay length
@@ -37,6 +41,32 @@ public:
         return dcaTrack1 > dcaTrack2; // Sort in descending order
     }
 
+    // Function to determine rejection based on pT
+    bool rejectLightFlavorJet(float jetPt)
+    {
+        // Define rejection thresholds based on pT bins
+        if (jetPt < 10.0)
+        {
+            return (static_cast<double>(std::rand()) / RAND_MAX) < 0.85;
+        }
+        else if (jetPt < 20.0)
+        {
+            return (static_cast<double>(std::rand()) / RAND_MAX) < 0.82;
+        }
+        else if (jetPt < 100.0)
+        {
+            return (static_cast<double>(std::rand()) / RAND_MAX) < 0.80;
+        }
+        else if (jetPt < 200.0)
+        {
+            return (static_cast<double>(std::rand()) / RAND_MAX) < 0.78;
+        }
+        else
+        {
+            return (static_cast<double>(std::rand()) / RAND_MAX) < 0.70;
+        }
+    }
+
     void processJet(const fastjet::PseudoJet &jet,
                     const std::vector<Track> &allTracks,
                     const std::vector<JParticle> &mcparticles,
@@ -52,6 +82,13 @@ public:
         treeData.mJetPhi = jet.phi();
         treeData.mJetMass = jet.m();
         treeData.mJetFlavor = getJetFlavor(jet, mcparticles, R, mDebugLevel);
+
+        // Reject light flavor jets based on pT
+        if (treeData.mJetFlavor == 0 && rejectLightFlavorJet(treeData.mJetpT))
+        {
+            mJetTree->clear();
+            return; // Skip processing for this jet if rejected
+        }
 
         // Process constituents
         std::vector<fastjet::PseudoJet> constituents = jet.constituents();

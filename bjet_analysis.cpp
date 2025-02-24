@@ -558,6 +558,17 @@ public:
             outFile->Close();
         }
 
+        TFile *xsecFile = new TFile("xsection.root", "RECREATE");
+        xsecFile->cd();
+        TProfile *pCrossSection = new TProfile("xsection", "Cross Section Profile; pT (GeV); Cross Section (pb)", 1, 0, 1);
+        TH1F *hTrials = new TH1F("hTrials", "Number of Trials; Trials; Counts", 1, 0, 1);
+
+        pCrossSection->Fill(0.5, pythia.info.sigmaGen());
+        hTrials->Fill(0.5, pythia.info.nTried());
+
+        xsecFile->Write();
+        xsecFile->Close();
+
         // Write tree
         mTreeGen->write();
 
@@ -565,7 +576,8 @@ public:
     }
 };
 
-void bjet_analysis(int nEvents = 10000, double pTHatMin = 20, double pTHatMax = -1, DebugLevel debugLevel = DebugLevel::INFO){
+void bjet_analysis(int nEvents = 10000, double pTHatMin = 20, double pTHatMax = -1, DebugLevel debugLevel = DebugLevel::INFO)
+{
 
     // Initialize features
     std::vector<std::string> features = {"JetpT", "JetEta", "JetPhi", "JetMass", "NTracks", "NSV", "JetFlavor",

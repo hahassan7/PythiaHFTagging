@@ -46,17 +46,38 @@ struct HFjetTree
     // Constructor to initialize arrays with -999
     HFjetTree()
     {
+        mJetpT = 0.0;
+        mJetEta = -99;
+        mJetPhi = -99;
+        mNTracks = -1;
+        mNSV = -1;
+        mJetMass = 0.0;
+        mJetFlavor = 0;
+
+        mTrackpT.fill(0);
+        mTrackEta.fill(-99);
+        mDotProdTrackJet.fill(0);
+        mDotProdTrackJetOverJet.fill(0);
+        mDeltaRJetTrack.fill(-1);
         mSignedIP2D.fill(-999);
         mSignedIP2DSign.fill(-999);
         mSignedIP3D.fill(-999);
         mSignedIP3DSign.fill(-999);
+        mMomFraction.fill(0);
+        mDeltaRTrackVertex.fill(-1);
 
+        mSVpT.fill(0);
+        mDeltaRSVJet.fill(-1);
+        mSVMass.fill(0);
+        mSVfE.fill(0);
         mIPxy.fill(-999);
         mCPA.fill(-999);
         mChi2PCA.fill(999);
         mDispersion.fill(999);
         mDecayLength2D.fill(-999);
+        mDecayLength2DError.fill(-999);
         mDecayLength3D.fill(-999);
+        mDecayLength3DError.fill(-999);
     }
 };
 

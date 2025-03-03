@@ -1,4 +1,4 @@
-#include "TaggingUtilities.h"
+#include "TaggingUtilities.cpp"
 #include "JTreeHFFeatures.h"
 #include "JetTreeGenerator.h"
 
@@ -94,6 +94,7 @@ public:
 
         // Add this with other histogram declarations
         TH1F *hPrimaryVertexZ = new TH1F("hPrimaryVertexZ", "Primary Vertex Z Position;z (cm);Counts", 100, -10, 10);
+        TH1F *hPrimaryVertexZDiff = new TH1F("hPrimaryVertexZDiff", "Primary Vertex Z Position;z (cm);Counts", 1000, -5, 5);
 
         // Initialize Pythia with more detailed error checking
         logLocal(DebugLevel::INFO, "Initializing Pythia...");
@@ -262,7 +263,7 @@ public:
                 double yPos = part.yProd() * 0.1;
                 double zPos = part.zProd() * 0.1;
                 double trueDCAz = zPos - truePrimaryVertex.Z();
-                double trueXYdca = std::copysign(std::sqrt(std::pow(xPos - truePrimaryVertex.X(), 2) + std::pow(yPos - truePrimaryVertex.Y(), 2)), yPos);
+                double trueXYdca = std::copysign(std::sqrt(std::pow(xPos - truePrimaryVertex.X(), 2) + std::pow(yPos - truePrimaryVertex.Y(), 2)), yPos - truePrimaryVertex.Y());
 
                 // Create truth track
                 Track truthTrack(TVector3(xPos, yPos, zPos),
@@ -271,6 +272,7 @@ public:
                                  trueDCAz,
                                  part.charge());
                 truthTracks.push_back(truthTrack);
+                truthTracks.back().setIndex(truthTracks.size() - 1);
 
                 // Add to jet finding
                 particles.push_back(fastjet::PseudoJet(
@@ -315,6 +317,9 @@ public:
                                                                          mDebugLevel); // Pass debug level
 
                 logLocal(DebugLevel::DEBUG, "Primary vertex found at: (" + std::to_string(primaryVertex.X()) + ", " + std::to_string(primaryVertex.Y()) + ", " + std::to_string(primaryVertex.Z()) + ")");
+
+                float vertexDifference = smearedPrimaryVertex.Z() - primaryVertex.Z();
+                hPrimaryVertexZDiff->Fill(vertexDifference);
 
                 // Safety check for vertex position
                 if (std::isnan(primaryVertex.X()) || std::isnan(primaryVertex.Y()) || std::isnan(primaryVertex.Z()))
@@ -363,6 +368,12 @@ public:
                         if (jet.E() <= 0 || std::isnan(jet.E()))
                         {
                             logLocal(DebugLevel::WARNING, "Invalid jet detected (E = " + std::to_string(jet.E()) + ")");
+                            continue;
+                        }
+
+                        if (jet.eta() > 0.5 || jet.eta() < -0.5)
+                        {
+                            logLocal(DebugLevel::DEBUG, "Jet outside acceptance (eta = " + std::to_string(jet.eta()) + ")");
                             continue;
                         }
 

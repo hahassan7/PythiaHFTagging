@@ -1,7 +1,7 @@
 #pragma once
 
 // Include FastJet compatibility layer first
-//#include "FastJetCompat.h"
+// #include "FastJetCompat.h"
 
 // First include system headers
 #include <vector>
@@ -114,7 +114,7 @@ public:
 
     // Main constructor
     Track(const TVector3 &p, const TVector3 &m, double dxy = 0, double dz = 0, double q = 0)
-        : pos(p), mom(m), dcaXY(dxy), dcaZ(dz), charge(q), index(-1)  // Initialize index
+        : pos(p), mom(m), dcaXY(dxy), dcaZ(dz), charge(q), index(-1) // Initialize index
     {
         // Validate inputs
         if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z()))
@@ -133,12 +133,12 @@ public:
 
     // Copy constructor
     Track(const Track &other)
-        : pos(other.pos), 
-          mom(other.mom), 
-          dcaXY(other.dcaXY), 
-          dcaZ(other.dcaZ), 
+        : pos(other.pos),
+          mom(other.mom),
+          dcaXY(other.dcaXY),
+          dcaZ(other.dcaZ),
           charge(other.charge),
-          index(other.index)  // Copy the index
+          index(other.index) // Copy the index
     {
         // Validate copied data
         if (std::isnan(pos.X()) || std::isnan(pos.Y()) || std::isnan(pos.Z()))
@@ -156,7 +156,7 @@ public:
     }
 
     // Assignment operator
-    Track& operator=(const Track &other)
+    Track &operator=(const Track &other)
     {
         if (this != &other)
         {
@@ -165,7 +165,7 @@ public:
             dcaXY = other.dcaXY;
             dcaZ = other.dcaZ;
             charge = other.charge;
-            index = other.index;  // Copy the index
+            index = other.index; // Copy the index
         }
         return *this;
     }
@@ -184,13 +184,13 @@ public:
     void setDCAxy(double dxy) { dcaXY = dxy; }
     void setDCAz(double dz) { dcaZ = dz; }
     void setCharge(double q) { charge = q; }
-    void setIndex(int idx) 
-    { 
+    void setIndex(int idx)
+    {
         if (idx < 0)
         {
             throw std::invalid_argument("Track index cannot be negative");
         }
-        index = idx; 
+        index = idx;
     }
 
     // Utility functions
@@ -314,13 +314,13 @@ private:
     TRandom3 random;
 
     // Resolution parameters
-    static constexpr double kDCAxyOffset = 4.0e-4; // 4 μm -> 0.004 cm
-    static constexpr double kDCAxySlope = 20.0e-4; // 20 μm -> 0.02 cm
-    static constexpr double kDCAzOffset = 4.0e-4;  // 4 μm -> 0.004 cm
-    static constexpr double kDCAzSlope = 20.0e-4;  // 20 μm -> 0.02 cm
+    static constexpr double kDCAxyOffset = 7.0e-4; // 4 μm -> 0.004 cm
+    static constexpr double kDCAxySlope = 23.0e-4; // 20 μm -> 0.02 cm
+    static constexpr double kDCAzOffset = 6.0e-4;  // 4 μm -> 0.004 cm
+    static constexpr double kDCAzSlope = 25.0e-4;  // 20 μm -> 0.02 cm
     static constexpr double kPtResA = 0.005;       // Constant term
-    static constexpr double kPtResB = 0.01;        // 1/pT term
-    static constexpr double kPtResC = 0.0003;      // pT term
+    static constexpr double kPtResB = 0.0008;      // 1/pT term
+    static constexpr double kPtResC = 0.001;       // pT term
     static constexpr double kPhiRes = 0.001;       // [rad]
     static constexpr double kThetaRes = 0.001;     // [rad]
     static constexpr double kVtxXYRes = 12e-4;     // 12 μm -> 0.0012 cm
@@ -406,13 +406,12 @@ public:
         double chi2 = 0.0;
         std::vector<size_t> indices;
 
-        SecVtxInfo() : 
-            position(0,0,0),
-            momentum(0,0,0,0),
-            significance(0),
-            nTracks(0),
-            chi2(0),
-            indices() {}
+        SecVtxInfo() : position(0, 0, 0),
+                       momentum(0, 0, 0, 0),
+                       significance(0),
+                       nTracks(0),
+                       chi2(0),
+                       indices() {}
     };
 
     SecondaryVertexFinder(DebugLevel level = DebugLevel::INFO) : debugLevel(level) {}
@@ -684,9 +683,9 @@ struct SVCalculations
         return (cross.Z() > 0. ? absImpPar : -1. * absImpPar);
     }
 
-    static double calculateDispersion(const SecondaryVertexFinder::SecVtxInfo &vtxInfo, 
-                                    const std::vector<Track> &allTracks,
-                                    DebugLevel debugLevel = DebugLevel::INFO)
+    static double calculateDispersion(const SecondaryVertexFinder::SecVtxInfo &vtxInfo,
+                                      const std::vector<Track> &allTracks,
+                                      DebugLevel debugLevel = DebugLevel::INFO)
     {
         if (vtxInfo.indices.empty())
         {
@@ -700,8 +699,8 @@ struct SVCalculations
             if (idx >= allTracks.size())
             {
                 log(debugLevel, DebugLevel::ERROR,
-                    "Invalid track index found: " + std::to_string(idx) + 
-                    " (valid range: 0 to " + std::to_string(allTracks.size() - 1) + ")");
+                    "Invalid track index found: " + std::to_string(idx) +
+                        " (valid range: 0 to " + std::to_string(allTracks.size() - 1) + ")");
                 return 0.0;
             }
         }
@@ -709,11 +708,14 @@ struct SVCalculations
         std::vector<Track> prongs;
         for (const auto &idx : vtxInfo.indices)
         {
-            try {
+            try
+            {
                 prongs.push_back(allTracks[idx]);
                 log(debugLevel, DebugLevel::VERBOSE,
                     "Added track " + std::to_string(idx));
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception &e)
+            {
                 log(debugLevel, DebugLevel::ERROR,
                     "Error copying track: " + std::string(e.what()));
                 return 0.0;
@@ -732,7 +734,7 @@ struct SVCalculations
             TVector3 diff = prong.getPosition() - vtxInfo.position;
             if (std::isnan(diff.Mag2()))
             {
-                log(debugLevel, DebugLevel::WARNING, 
+                log(debugLevel, DebugLevel::WARNING,
                     "Invalid distance calculation in dispersion");
                 continue;
             }

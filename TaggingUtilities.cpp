@@ -88,13 +88,13 @@ void DetectorSimulation::smearDCA(const Pythia8::Particle& part, Track& track,
     double posY = part.yProd() * 0.1 - primaryVertex.Y();
     double posZ = part.zProd() * 0.1 - primaryVertex.Z();
 
-    double smeared_dcaxy = std::sqrt(posX * posX + posY * posY);
+    double smeared_dcaxy = std::copysign(std::sqrt(posX * posX + posY * posY), posY);
     smeared_dcaxy = random.Gaus(smeared_dcaxy, dca_resolution_xy);
     double smeared_dcaz = random.Gaus(posZ, dca_resolution_z);
 
     track.setDCAxy(smeared_dcaxy);
     track.setDCAz(smeared_dcaz);
 
-    TVector3 pos(posX, posY, posZ);
+    TVector3 pos(part.xProd() * 0.1, part.yProd() * 0.1, part.zProd() * 0.1);
     track.setPosition(pos);
 } 

@@ -1,6 +1,6 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -Wall -Wextra -O2 -std=c++17 -g
+CXXFLAGS = -Wall -Wextra -O2 -std=c++20 -g
 
 # ROOT configuration
 ROOT_CFLAGS = $(shell root-config --cflags)
@@ -8,7 +8,7 @@ ROOT_LIBS = $(shell root-config --libs)
 ROOT_GLIBS = $(shell root-config --glibs)
 
 # Pythia8 configuration
-PYTHIA8_DIR = $(shell pythia8-config --prefix)
+PYTHIA8_DIR = $(PYTHIA8)
 PYTHIA8_INCLUDE = -I$(PYTHIA8_DIR)/include
 PYTHIA8_LIBS = -L$(PYTHIA8_DIR)/lib -lpythia8
 
@@ -32,7 +32,7 @@ all: $(TARGET)
 
 # Main target
 $(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(ALL_INCLUDES) $(OBJECTS) -o $@ $(ALL_LIBS)
+	$(CXX) $(CXXFLAGS) $(ALL_INCLUDES) $(OBJECTS) -o $@ $(ALL_LIBS) -Wl,--no-as-needed
 
 # Explicit compilation rules for each source file
 bjet_analysis.o: bjet_analysis.cpp
@@ -71,7 +71,7 @@ help:
 	@echo "  help             - Show this help message"
 
 # Dependencies
-pythia_lambda_c.o: pythia_lambda_c.cpp
-LambdaCGenerator.o: LambdaCGenerator.h
+TaggingUtilities.o: TaggingUtilities.cpp
+bjet_analysis.o: bjet_analysis.cpp
 
 .PHONY: all clean distclean run debug help

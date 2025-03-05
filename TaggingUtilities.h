@@ -38,7 +38,7 @@
 #endif
 
 #ifdef __CLING__
-R__LOAD_LIBRARY(libpythia8.dylib)
+R__LOAD_LIBRARY(libpythia8)
 R__ADD_INCLUDE_PATH($PYTHIA_ROOT / include)
 #endif
 

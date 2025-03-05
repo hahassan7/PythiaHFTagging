@@ -1,0 +1,17 @@
+#!/bin/bash
+
+dataname=${1} # The data set to run on
+nJets=${2} # The number of jets used for training/testing
+minpt=${3} # min pT of the selected jets
+maxpt=${4} # max pT of the selected jets
+
+jobid=$SLURM_JOB_ID
+export seed=$((jobid+2000))
+
+export currentDir=$(pwd)
+
+export APPTAINER_BIND="/projappl/project_2003583,/scratch/project_2003583,$TMPDIR"
+export APPTAINER_SHELL="/bin/bash --norc"
+export APPTAINER_CACHEDIR=$TMPDIR
+
+apptainer exec --nv -H /home/hadi --workdir $TMPDIR -B /scratch/project_2003583/focal-full-sim:/home/hadi /scratch/project_2003583/focal-full-sim/HadiTest/ubuntu_singularity_gpu.sif ${currentDir}/inside_container.sh $dataname $nJets $minpt $maxpt

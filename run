@@ -1,0 +1,28 @@
+#!/bin/bash
+
+export dir=${1}
+export NEVENTS=${2}
+export PTHATMIN=${3}
+export PTHATMAX=${4}
+
+jobid=$SLURM_JOB_ID
+export CONFIG_SEED=$RANDOM
+
+export currentDir=$(pwd)
+cd $dir
+
+echo "Run Pythia8 simulation, running $NEVENTS events with pTHatMin $PTHATMIN and pTHatMax $PTHATMAX"
+time=$(date)
+echo "Start time : $time"
+
+export APPTAINER_BIND="/projappl/project_2003583,/scratch/project_2003583,$TMPDIR"
+export APPTAINER_SHELL="/bin/bash --norc"
+export APPTAINER_CACHEDIR=$TMPDIR
+
+# HERE CHOOSE THE CONTAINER TO BE USED
+
+apptainer exec -H /home/hadi --workdir $TMPDIR -B /scratch/project_2003583/focal-full-sim:/home/hadi -B /appl/:/appl/ /scratch/project_2003583/focal-full-sim/container_cs8.sif ${currentDir}/inside_container.sh
+
+time=$(date)
+echo "Simulation ready: $time"
+echo "Job is finished!"

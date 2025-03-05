@@ -18,6 +18,13 @@ public:
           mDebugLevel(debugLevel)
     {
     }
+    BjetAnalysis(std::string modelpath, std::vector<std::string> features, DebugLevel debugLevel = DebugLevel::INFO)
+        : mTreeGen(std::make_unique<JetTreeGenerator<10>>(features, modelpath.c_str(), debugLevel)),
+          mDetector(), // Default constructor
+          mSvFinder(debugLevel),
+          mDebugLevel(debugLevel)
+    {
+    }
 
     void analyze(int nEvents = 10000, double pTHatmin = 20, double pTHatmax = -1)
     {
@@ -106,6 +113,14 @@ public:
         // pythia.readString("Random:setSeed = on");
         // pythia.readString("Random:seed = " + std::to_string(pythiaSeed));
         // std::cout << "Set Pythia random seed to: " << pythiaSeed << std::endl;
+
+        if (gSystem->Getenv("CONFIG_SEED"))
+        {
+            int64_t pythiaSeed = atoi(gSystem->Getenv("CONFIG_SEED"));
+            pythia.readString("Random:setSeed = on");
+            pythia.readString("Random:seed = " + std::to_string(pythiaSeed % 900000000));
+            logLocal(DebugLevel::INFO, "Set Pythia random seed to: " + std::to_string(pythiaSeed));
+        }
 
         // Basic settings
         pythia.readString("Beams:eCM = 13000.");
@@ -482,8 +497,17 @@ public:
                         }
 
                         // Process jets
-                        mTreeGen->processJet(jet, allTracks, mcparticles, secondaryVertices,
-                                             primaryVertex, R);
+                        float score = 0.0;
+                        if (mTreeGen->getDoPrediction())
+                        {
+                            auto [jetparams, trackparams, svparams] = mTreeGen->processJetFeatures(jet, allTracks, secondaryVertices, primaryVertex);
+                            auto output = mTreeGen->predict(jetparams, trackparams, svparams);
+                            score = output[0];
+                        }
+                        else
+                        {
+                            mTreeGen->processJet(jet, allTracks, mcparticles, secondaryVertices, primaryVertex, R);
+                        }
                     }
 
                     // Update counters safely
@@ -581,24 +605,35 @@ public:
         xsecFile->Close();
 
         // Write tree
-        mTreeGen->write();
+        if (!mTreeGen->getDoPrediction())
+        {
+            mTreeGen->write();
+        }
 
         logLocal(DebugLevel::INFO, "Analysis completed successfully!");
     }
 };
 
-void bjet_analysis(int nEvents = 10000, double pTHatMin = 20, double pTHatMax = -1, DebugLevel debugLevel = DebugLevel::INFO)
+void bjet_analysis(int nEvents = 10000, double pTHatMin = 20, double pTHatMax = -1, std::string modelpath = "/Users/hadi/bjetAnalysisML/ML_bjets/Models/LHC24g4_40_70/model.onnx", DebugLevel debugLevel = DebugLevel::INFO)
 {
-
     // Initialize features
-    std::vector<std::string> features = {"JetpT", "JetEta", "JetPhi", "JetMass", "NTracks", "NSV", "JetFlavor",
-                                         "TrackpT", "TrackEta", "DotProdTrackJet", "DotProdTrackJetOverJet", "DeltaRJetTrack", "SignedIP2D", "SignedIP3D",
-                                         "MomFraction", "DeltaRTrackVertex",
-                                         "SVpT", "DeltaRSVJet", "SVMass", "SVfE", "IPxy", "CPA", "Chi2PCA",
-                                         "Dispersion", "DecayLength2D", "DecayLength3D"};
+    std::vector<std::string> features = {"jetpT", "jetEta", "jetPhi", "jetMass", "nTracks", "nSV", "jetFlavor",
+                                         "trackpT", "trackEta", "dotProdTrackJet", "dotProdTrackJetOverJet",
+                                         "deltaRJetTrack", "signedIP2D", "signedIP3D", "momFraction", "deltaRTrackVertex",
+                                         "svPt", "deltaRSVJet", "svMass", "svfE", "svIPxy", "svCPA", "svChi2PCA",
+                                         "svDispersion", "svDecayLength2D", "svDecayLength3D"};
 
-    BjetAnalysis bjetAnalysis(features, debugLevel);
-    bjetAnalysis.analyze(nEvents, pTHatMin, pTHatMax);
+    if (!modelpath.empty())
+    {
+        features.erase(features.begin() + 6); // Remove jetFlavor
+        BjetAnalysis bjetAnalysis(modelpath, features, debugLevel);
+        bjetAnalysis.analyze(nEvents, pTHatMin, pTHatMax);
+    }
+    else
+    {
+        BjetAnalysis bjetAnalysis(features, debugLevel);
+        bjetAnalysis.analyze(nEvents, pTHatMin, pTHatMax);
+    }
 }
 
 // Update main to accept number of events
@@ -607,6 +642,7 @@ int main(int argc, char *argv[])
     int nEvents = 10000; // default value
     double pTHatMin = 20;
     double pTHatMax = -1;
+    std::string modelpath = "";
     DebugLevel debugLevel = DebugLevel::INFO;
 
     // Parse command line arguments
@@ -650,6 +686,13 @@ int main(int argc, char *argv[])
                 pTHatMax = std::atoi(argv[++i]);
             }
         }
+        else if (arg == "-ml" | arg == "--modelPath")
+        {
+            if (i + 1 < argc)
+            {
+                modelpath = std::string(argv[++i]);
+            }
+        }
         else if (arg == "-h" || arg == "--help")
         {
             std::cout << "Usage: " << argv[0] << " [options]\n"
@@ -658,11 +701,12 @@ int main(int argc, char *argv[])
                       << "  -d, --debug N             Debug level (0-5, default: 3)\n"
                       << "  -pmin, --pTHatMin pt      Min pT of the hard scattering\n"
                       << "  -pmax, --pTHatMax pt      Max pT of the hard scattering\n"
+                      << "  -ml, --modelPath path     ML model path\n"
                       << "  -h, --help                Show this help message\n";
             return 0;
         }
     }
 
-    bjet_analysis(nEvents, pTHatMin, pTHatMax, debugLevel);
+    bjet_analysis(nEvents, pTHatMin, pTHatMax, modelpath, debugLevel);
     return 0;
 }

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <random>
 #include <memory>
+#include <array>
 
 // Custom headers
 #include "JParticle.h"
@@ -19,12 +20,11 @@
 #include "TH1F.h"
 #include "TH2F.h"
 #include "TFile.h"
-#include "TTree.h"
 #include "TVector3.h"
 #include "TRandom3.h"
 #include "TLorentzVector.h"
-#include "TMatrixD.h"
 #include "TProfile.h"
+#include "TParticle.h"
 
 // Pythia headers
 #include "Pythia8/Pythia.h"
@@ -41,11 +41,6 @@
 R__LOAD_LIBRARY(libpythia8.dylib)
 R__ADD_INCLUDE_PATH($PYTHIA_ROOT / include)
 #endif
-
-#include "JTreeHFFeatures.h"
-#include "TRandom3.h"
-#include "TMatrixD.h"
-#include "TParticle.h"
 
 #ifdef __CLING__
 R__LOAD_LIBRARY(libfastjet)

@@ -3,6 +3,7 @@
 
 #include "JTreeHFFeatures.h"
 #include "TaggingUtilities.h"
+#include "MLForHFTagging.h"
 #include "TVector2.h"
 #include <memory>
 #include <algorithm>
@@ -13,17 +14,30 @@ class JetTreeGenerator
 {
 private:
     std::unique_ptr<JTreeHFFeatures<N>> mJetTree;
+    MLForHFTagging mFeatureMaker;
+    std::unique_ptr<JetModel<N>> mMLModel;
     DebugLevel mDebugLevel;
+    bool mDoPrediction = false;
 
 public:
     JetTreeGenerator(const char *filename, std::vector<std::string> features, DebugLevel debugLevel = DebugLevel::INFO)
-        : mDebugLevel(debugLevel)
+        : mDebugLevel(debugLevel), mDoPrediction(false)
     {
         mJetTree = std::make_unique<JTreeHFFeatures<N>>(filename, features);
 
         // Seed the random number generator using current time
         std::srand(static_cast<unsigned int>(std::time(nullptr)));
     }
+
+    JetTreeGenerator(std::vector<std::string> features, const char *modelpath, DebugLevel debugLevel = DebugLevel::INFO)
+        : mDebugLevel(debugLevel), mDoPrediction(true)
+    {
+        mFeatureMaker.cacheInputFeaturesIndices(features);
+        mMLModel = std::make_unique<JetModel<N>>(modelpath);
+    }
+
+    void setDoPrediction(bool doPrediction) { mDoPrediction = doPrediction; }
+    bool getDoPrediction() const { return mDoPrediction; }
 
     // Comparison function for sorting secondary vertices based on 2D decay length
     bool compareDecayLength2D(const SecondaryVertexFinder::SecVtxInfo &a,
@@ -191,6 +205,137 @@ public:
         }
 
         mJetTree->fill();
+    }
+
+    std::tuple<BJetParams, std::vector<BJetTrackParams>, std::vector<BJetSVParams>> processJetFeatures(const fastjet::PseudoJet &jet,
+                                                                                                       const std::vector<Track> &allTracks,
+                                                                                                       std::vector<SecondaryVertexFinder::SecVtxInfo> &secondaryVertices,
+                                                                                                       const TVector3 &primaryVertex)
+    {
+
+        BJetParams jetparams;
+        std::vector<BJetTrackParams> trackparams;
+        std::vector<BJetSVParams> svparams;
+
+        // Fill jet features
+        jetparams.jetpT = jet.pt();
+        jetparams.jetEta = jet.eta();
+        jetparams.jetPhi = jet.phi();
+        jetparams.jetMass = jet.m();
+
+        // Process constituents
+        std::vector<fastjet::PseudoJet> constituents = jet.constituents();
+        jetparams.nTracks = constituents.size();
+        jetparams.nSV = secondaryVertices.size();
+
+        // Process tracks
+        std::vector<Track> sortedTracks; // Vector to hold sorted tracks
+        for (size_t iTrack = 0; iTrack < constituents.size(); ++iTrack)
+        {
+            size_t trackIndex = constituents[iTrack].user_index();
+            if (trackIndex < allTracks.size())
+            {
+                sortedTracks.push_back(allTracks[trackIndex]); // Add track to the sorted list
+            }
+        }
+
+        // Sort secondary vertices based on 2D decay length (descending order)
+        std::sort(sortedTracks.begin(), sortedTracks.end(),
+                  [&](const Track &a, const Track &b)
+                  {
+                      return compareIP2D(a, b, jet, primaryVertex);
+                  });
+
+        // Process tracks
+        TVector3 jetVec(jet.px(), jet.py(), jet.pz());
+        for (size_t iTrack = 0; iTrack < std::min(sortedTracks.size(), size_t(N)); ++iTrack)
+        {
+            const auto &track = sortedTracks[iTrack];
+
+            // Basic track kinematics
+            BJetTrackParams trackparam;
+            trackparam.trackpT = track.pt();
+            trackparam.trackEta = track.eta();
+
+            // Track-jet correlation features
+            trackparam.dotProdTrackJet = track.getMomentum().Dot(jetVec);
+            trackparam.dotProdTrackJetOverJet = track.getMomentum().Dot(jetVec) / jetVec.Mag();
+            trackparam.deltaRJetTrack = deltaR(track, jetVec);
+
+            // Impact parameter features
+            int sign = getGeoSign(jet, track, primaryVertex);
+            trackparam.signedIP2D = sign * std::abs(track.getDCAxy());
+            trackparam.signedIP3D = sign * std::abs(track.getDCAz());
+
+            // Momentum fraction
+            trackparam.momFraction = track.pt() / jet.pt();
+
+            // Track to primary vertex distance
+            double minDistance = std::numeric_limits<double>::max();
+            for (auto &vertex : secondaryVertices)
+            {
+                double distance = deltaR(track, vertex.momentum);
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                }
+            }
+            trackparam.deltaRTrackVertex = minDistance;
+            trackparams.push_back(trackparam);
+        }
+
+        // Sort secondary vertices based on 2D decay length (descending order)
+        std::sort(secondaryVertices.begin(), secondaryVertices.end(),
+                  [&](const SecondaryVertexFinder::SecVtxInfo &a, const SecondaryVertexFinder::SecVtxInfo &b)
+                  {
+                      return compareDecayLength2D(a, b, primaryVertex);
+                  });
+
+        // Process secondary vertices
+        for (size_t iSV = 0; iSV < std::min(secondaryVertices.size(), size_t(N)); ++iSV)
+        {
+            BJetSVParams svparam;
+            const auto &sv = secondaryVertices[iSV];
+            TVector3 svMomentum(sv.momentum.Px(), sv.momentum.Py(), sv.momentum.Pz());
+            TVector3 flightLine = sv.position - primaryVertex;
+
+            // Basic SV kinematics
+            svparam.svPt = sv.momentum.Pt();
+            svparam.svMass = sv.momentum.M();
+
+            // SV-jet correlation
+            svparam.deltaRSVJet = deltaR(jet, sv.momentum);
+
+            // Energy fraction
+            svparam.svfE = sv.momentum.E() / jet.e();
+
+            // Impact parameter
+            svparam.svIPxy = SVCalculations::calculateIPxy(primaryVertex, sv.position, sv.momentum.Vect());
+
+            // Pointing angle
+            svparam.svCPA = SVCalculations::calculateCPA(primaryVertex, sv.position, sv.momentum.Vect());
+
+            // Chi2 of PCA
+            svparam.svChi2PCA = sv.chi2;
+
+            // Vertex dispersion
+            svparam.svDispersion = SVCalculations::calculateDispersion(sv, allTracks);
+
+            // Decay lengths
+            svparam.svDecayLength2D = SVCalculations::calculateDecayLength2D(primaryVertex, sv.position);
+            svparam.svDecayLength3D = SVCalculations::calculateDecayLength3D(primaryVertex, sv.position);
+            svparams.push_back(svparam);
+        }
+
+        trackparams.resize(N);
+        svparams.resize(N);
+        return std::make_tuple(jetparams, trackparams, svparams);
+    }
+
+    std::vector<float> predict(const BJetParams &jetparams, const std::vector<BJetTrackParams> &trackparams, const std::vector<BJetSVParams> &svparams)
+    {
+        auto inputFeatures = mFeatureMaker.getInputFeatures2D(jetparams, trackparams, svparams);
+        return mMLModel->predict(inputFeatures[0], inputFeatures[1], inputFeatures[2]);
     }
 
     void write()

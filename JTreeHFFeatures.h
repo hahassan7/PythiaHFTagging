@@ -84,40 +84,49 @@ struct HFjetTree
 enum class HFFeatures : uint8_t
 {
     // Jet features
-    JetpT = 0,
-    JetEta,
-    JetPhi,
-    JetMass,
-    NTracks,
-    NSV,
-    JetFlavor,
+    jetpT = 0,
+    jetEta,
+    jetPhi,
+    nTracks,
+    nSV,
+    jetMass,
+    jetFlavor,
 
     // Track features
-    TrackpT,
-    TrackEta,
-    DotProdTrackJet,
-    DotProdTrackJetOverJet,
-    DeltaRJetTrack,
-    SignedIP2D,
-    SignedIP2DSign,
-    SignedIP3D,
-    SignedIP3DSign,
-    MomFraction,
-    DeltaRTrackVertex,
+    trackpT,
+    trackEta,
+    dotProdTrackJet,
+    dotProdTrackJetOverJet,
+    deltaRJetTrack,
+    signedIP2D,
+    signedIP2DSign,
+    signedIP3D,
+    signedIP3DSign,
+    momFraction,
+    deltaRTrackVertex,
+    trackPhi,
+    trackCharge,
+    trackITSChi2NCl,
+    trackTPCChi2NCl,
+    trackITSNCls,
+    trackTPCNCls,
+    trackTPCNCrossedRows,
+    trackOrigin,
+    trackVtxIndex,
 
-    // SV features
-    SVpT,
-    DeltaRSVJet,
-    SVMass,
-    SVfE,
-    IPxy,
-    CPA,
-    Chi2PCA,
-    Dispersion,
-    DecayLength2D,
-    DecayLength2DError,
-    DecayLength3D,
-    DecayLength3DError
+    // Secondary vertex features
+    svPt,
+    deltaRSVJet,
+    svMass,
+    svfE,
+    svIPxy,
+    svCPA,
+    svChi2PCA,
+    svDispersion,
+    svDecayLength2D,
+    svDecayLength2DError,
+    svDecayLength3D,
+    svDecayLength3DError,
 };
 
 // Define the macro for filling the feature map
@@ -127,19 +136,19 @@ enum class HFFeatures : uint8_t
   }
 
 // Macro for scalar branches
-#define CREATE_BRANCH_HF_SCALAR(FEATURE, BRANCHNAME, TYPE)                                          \
-    case static_cast<uint8_t>(HFFeatures::FEATURE):                                                 \
-    {                                                                                               \
-        tree->Branch(BRANCHNAME, &data.m##FEATURE, (std::string(BRANCHNAME) + "/" + TYPE).c_str()); \
-        break;                                                                                      \
+#define CREATE_BRANCH_HF_SCALAR(FEATURE, FEATURE1, BRANCHNAME, TYPE)                                 \
+    case static_cast<uint8_t>(HFFeatures::FEATURE):                                                  \
+    {                                                                                                \
+        tree->Branch(BRANCHNAME, &data.m##FEATURE1, (std::string(BRANCHNAME) + "/" + TYPE).c_str()); \
+        break;                                                                                       \
     }
 
 // Macro for array branches
-#define CREATE_BRANCH_HF_ARRAY(FEATURE, BRANCHNAME, TYPE)                                                                      \
-    case static_cast<uint8_t>(HFFeatures::FEATURE):                                                                            \
-    {                                                                                                                          \
-        tree->Branch(BRANCHNAME, &data.m##FEATURE, (std::string(BRANCHNAME) + "[" + std::to_string(N) + "]/" + TYPE).c_str()); \
-        break;                                                                                                                 \
+#define CREATE_BRANCH_HF_ARRAY(FEATURE, FEATURE1, BRANCHNAME, TYPE)                                                             \
+    case static_cast<uint8_t>(HFFeatures::FEATURE):                                                                             \
+    {                                                                                                                           \
+        tree->Branch(BRANCHNAME, &data.m##FEATURE1, (std::string(BRANCHNAME) + "[" + std::to_string(N) + "]/" + TYPE).c_str()); \
+        break;                                                                                                                  \
     }
 
 template <std::size_t N = 10>
@@ -156,40 +165,40 @@ private:
     {
         mAvailableFeatures = {
             // Jet features
-            FILL_MAP_HF(JetpT),
-            FILL_MAP_HF(JetEta),
-            FILL_MAP_HF(JetPhi),
-            FILL_MAP_HF(JetMass),
-            FILL_MAP_HF(NTracks),
-            FILL_MAP_HF(NSV),
-            FILL_MAP_HF(JetFlavor),
+            FILL_MAP_HF(jetpT),
+            FILL_MAP_HF(jetEta),
+            FILL_MAP_HF(jetPhi),
+            FILL_MAP_HF(jetMass),
+            FILL_MAP_HF(nTracks),
+            FILL_MAP_HF(nSV),
+            FILL_MAP_HF(jetFlavor),
 
             // Track features
-            FILL_MAP_HF(TrackpT),
-            FILL_MAP_HF(TrackEta),
-            FILL_MAP_HF(DotProdTrackJet),
-            FILL_MAP_HF(DotProdTrackJetOverJet),
-            FILL_MAP_HF(DeltaRJetTrack),
-            FILL_MAP_HF(SignedIP2D),
-            FILL_MAP_HF(SignedIP2DSign),
-            FILL_MAP_HF(SignedIP3D),
-            FILL_MAP_HF(SignedIP3DSign),
-            FILL_MAP_HF(MomFraction),
-            FILL_MAP_HF(DeltaRTrackVertex),
+            FILL_MAP_HF(trackpT),
+            FILL_MAP_HF(trackEta),
+            FILL_MAP_HF(dotProdTrackJet),
+            FILL_MAP_HF(dotProdTrackJetOverJet),
+            FILL_MAP_HF(deltaRJetTrack),
+            FILL_MAP_HF(signedIP2D),
+            FILL_MAP_HF(signedIP2DSign),
+            FILL_MAP_HF(signedIP3D),
+            FILL_MAP_HF(signedIP3DSign),
+            FILL_MAP_HF(momFraction),
+            FILL_MAP_HF(deltaRTrackVertex),
 
             // SV features
-            FILL_MAP_HF(SVpT),
-            FILL_MAP_HF(DeltaRSVJet),
-            FILL_MAP_HF(SVMass),
-            FILL_MAP_HF(SVfE),
-            FILL_MAP_HF(IPxy),
-            FILL_MAP_HF(CPA),
-            FILL_MAP_HF(Chi2PCA),
-            FILL_MAP_HF(Dispersion),
-            FILL_MAP_HF(DecayLength2D),
-            FILL_MAP_HF(DecayLength2DError),
-            FILL_MAP_HF(DecayLength3D),
-            FILL_MAP_HF(DecayLength3DError)};
+            FILL_MAP_HF(svPt),
+            FILL_MAP_HF(deltaRSVJet),
+            FILL_MAP_HF(svMass),
+            FILL_MAP_HF(svfE),
+            FILL_MAP_HF(svIPxy),
+            FILL_MAP_HF(svCPA),
+            FILL_MAP_HF(svChi2PCA),
+            FILL_MAP_HF(svDispersion),
+            FILL_MAP_HF(svDecayLength2D),
+            FILL_MAP_HF(svDecayLength2DError),
+            FILL_MAP_HF(svDecayLength3D),
+            FILL_MAP_HF(svDecayLength3DError)};
     }
 
     void createSelectedBranches()
@@ -199,40 +208,40 @@ private:
             switch (featureIdx)
             {
                 // Jet features
-                CREATE_BRANCH_HF_SCALAR(JetpT, "jetPt", "F")
-                CREATE_BRANCH_HF_SCALAR(JetEta, "jetEta", "F")
-                CREATE_BRANCH_HF_SCALAR(JetPhi, "jetPhi", "F")
-                CREATE_BRANCH_HF_SCALAR(JetMass, "jetMass", "F")
-                CREATE_BRANCH_HF_SCALAR(NTracks, "nTracks", "I")
-                CREATE_BRANCH_HF_SCALAR(NSV, "nSV", "I")
-                CREATE_BRANCH_HF_SCALAR(JetFlavor, "jetFlavor", "I")
+                CREATE_BRANCH_HF_SCALAR(jetpT, JetpT, "jetPt", "F")
+                CREATE_BRANCH_HF_SCALAR(jetEta, JetEta, "jetEta", "F")
+                CREATE_BRANCH_HF_SCALAR(jetPhi, JetPhi, "jetPhi", "F")
+                CREATE_BRANCH_HF_SCALAR(jetMass, JetMass, "jetMass", "F")
+                CREATE_BRANCH_HF_SCALAR(nTracks, NTracks, "nTracks", "I")
+                CREATE_BRANCH_HF_SCALAR(nSV, NSV, "nSV", "I")
+                CREATE_BRANCH_HF_SCALAR(jetFlavor, JetFlavor, "jetFlavor", "I")
 
                 // Track features
-                CREATE_BRANCH_HF_ARRAY(TrackpT, "trackPt", "F")
-                CREATE_BRANCH_HF_ARRAY(TrackEta, "trackEta", "F")
-                CREATE_BRANCH_HF_ARRAY(DotProdTrackJet, "dotProdTrackJet", "F")
-                CREATE_BRANCH_HF_ARRAY(DotProdTrackJetOverJet, "dotProdTrackJetOverJet", "F")
-                CREATE_BRANCH_HF_ARRAY(DeltaRJetTrack, "deltaRJetTrack", "F")
-                CREATE_BRANCH_HF_ARRAY(SignedIP2D, "signedIP2D", "F")
-                CREATE_BRANCH_HF_ARRAY(SignedIP2DSign, "signedIP2DSign", "F")
-                CREATE_BRANCH_HF_ARRAY(SignedIP3D, "signedIP3D", "F")
-                CREATE_BRANCH_HF_ARRAY(SignedIP3DSign, "signedIP3DSign", "F")
-                CREATE_BRANCH_HF_ARRAY(MomFraction, "momFraction", "F")
-                CREATE_BRANCH_HF_ARRAY(DeltaRTrackVertex, "deltaRTrackVertex", "F")
+                CREATE_BRANCH_HF_ARRAY(trackpT, TrackpT, "trackPt", "F")
+                CREATE_BRANCH_HF_ARRAY(trackEta, TrackEta, "trackEta", "F")
+                CREATE_BRANCH_HF_ARRAY(dotProdTrackJet, DotProdTrackJet, "dotProdTrackJet", "F")
+                CREATE_BRANCH_HF_ARRAY(dotProdTrackJetOverJet, DotProdTrackJetOverJet, "dotProdTrackJetOverJet", "F")
+                CREATE_BRANCH_HF_ARRAY(deltaRJetTrack, DeltaRJetTrack, "deltaRJetTrack", "F")
+                CREATE_BRANCH_HF_ARRAY(signedIP2D, SignedIP2D, "signedIP2D", "F")
+                CREATE_BRANCH_HF_ARRAY(signedIP2DSign, SignedIP2DSign, "signedIP2DSign", "F")
+                CREATE_BRANCH_HF_ARRAY(signedIP3D, SignedIP3D, "signedIP3D", "F")
+                CREATE_BRANCH_HF_ARRAY(signedIP3DSign, SignedIP3DSign, "signedIP3DSign", "F")
+                CREATE_BRANCH_HF_ARRAY(momFraction, MomFraction, "momFraction", "F")
+                CREATE_BRANCH_HF_ARRAY(deltaRTrackVertex, DeltaRTrackVertex, "deltaRTrackVertex", "F")
 
                 // SV features
-                CREATE_BRANCH_HF_ARRAY(SVpT, "svPt", "F")
-                CREATE_BRANCH_HF_ARRAY(DeltaRSVJet, "deltaRSVJet", "F")
-                CREATE_BRANCH_HF_ARRAY(SVMass, "svMass", "F")
-                CREATE_BRANCH_HF_ARRAY(SVfE, "svfE", "F")
-                CREATE_BRANCH_HF_ARRAY(IPxy, "svIPxy", "F")
-                CREATE_BRANCH_HF_ARRAY(CPA, "svCPA", "F")
-                CREATE_BRANCH_HF_ARRAY(Chi2PCA, "svChi2", "F")
-                CREATE_BRANCH_HF_ARRAY(Dispersion, "svDispersion", "F")
-                CREATE_BRANCH_HF_ARRAY(DecayLength2D, "svDecayLength2D", "F")
-                CREATE_BRANCH_HF_ARRAY(DecayLength2DError, "svDecayLength2DError", "F")
-                CREATE_BRANCH_HF_ARRAY(DecayLength3D, "svDecayLength3D", "F")
-                CREATE_BRANCH_HF_ARRAY(DecayLength3DError, "svDecayLength3DError", "F")
+                CREATE_BRANCH_HF_ARRAY(svPt, SVpT, "svPt", "F")
+                CREATE_BRANCH_HF_ARRAY(deltaRSVJet, DeltaRSVJet, "deltaRSVJet", "F")
+                CREATE_BRANCH_HF_ARRAY(svMass, SVMass, "svMass", "F")
+                CREATE_BRANCH_HF_ARRAY(svfE, SVfE, "svfE", "F")
+                CREATE_BRANCH_HF_ARRAY(svIPxy, IPxy, "svIPxy", "F")
+                CREATE_BRANCH_HF_ARRAY(svCPA, CPA, "svCPA", "F")
+                CREATE_BRANCH_HF_ARRAY(svChi2PCA, Chi2PCA, "svChi2PCA", "F")
+                CREATE_BRANCH_HF_ARRAY(svDispersion, Dispersion, "svDispersion", "F")
+                CREATE_BRANCH_HF_ARRAY(svDecayLength2D, DecayLength2D, "svDecayLength2D", "F")
+                CREATE_BRANCH_HF_ARRAY(svDecayLength2DError, DecayLength2DError, "svDecayLength2DError", "F")
+                CREATE_BRANCH_HF_ARRAY(svDecayLength3D, DecayLength3D, "svDecayLength3D", "F")
+                CREATE_BRANCH_HF_ARRAY(svDecayLength3DError, DecayLength3DError, "svDecayLength3DError", "F")
             }
         }
     }
@@ -252,6 +261,8 @@ public:
             if (it != mAvailableFeatures.end())
             {
                 mSelectedFeatures.push_back(it->second);
+            } else {
+                throw std::runtime_error("Feature " + feature + " not found in the available features list");
             }
         }
 

@@ -284,7 +284,7 @@ def GetDataForKeras(data):
   arr_mSVfE     = pd.concat([data['svfE[{}]'.format(i)] for i in range(10)], axis=1).values
   arr_mIPXY     = pd.concat([data['svIPxy[{}]'.format(i)] for i in range(10)], axis=1).values
   arr_mCPA     = pd.concat([data['svCPA[{}]'.format(i)] for i in range(10)], axis=1).values
-  arr_mChi2PCA     = pd.concat([data['svChi2[{}]'.format(i)] for i in range(10)], axis=1).values
+  arr_mChi2PCA     = pd.concat([data['svChi2PCA[{}]'.format(i)] for i in range(10)], axis=1).values
   arr_mDispersion     = pd.concat([data['svDispersion[{}]'.format(i)] for i in range(10)], axis=1).values
   arr_mDecayLength2D     = pd.concat([data['svDecayLength2D[{}]'.format(i)] for i in range(10)], axis=1).values
   arr_mDecayLength3D     = pd.concat([data['svDecayLength3D[{}]'.format(i)] for i in range(10)], axis=1).values

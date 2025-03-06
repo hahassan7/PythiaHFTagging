@@ -10,16 +10,31 @@ ROOT_GLIBS = $(shell root-config --glibs)
 # Pythia8 configuration
 PYTHIA8_DIR = $(PYTHIA8)
 PYTHIA8_INCLUDE = -I$(PYTHIA8_DIR)/include
-PYTHIA8_LIBS = -L$(PYTHIA8_DIR)/lib -lpythia8
+PYTHIA8_LIBS = -L$(PYTHIA8_DIR)/lib -Wl,-rpath,$(PYTHIA8_DIR)/lib -lpythia8
 
 # FastJet configuration - use exact output from fastjet-config
 FASTJET_INCLUDE = $(shell fastjet-config --cxxflags)
 FASTJET_LIBS = $(shell fastjet-config --libs)
 
+# ONNX Runtime configuration
+ONNXRUNTIME_DIR = /Users/hadi/alice/sw/osx_arm64/ONNXRuntime/latest
+ONNXRUNTIME_INCLUDE = -I$(ONNXRUNTIME_DIR)/include/onnxruntime
+ONNXRUNTIME_LIBS = -L$(ONNXRUNTIME_DIR)/lib -Wl,-rpath,$(ONNXRUNTIME_DIR)/lib -lonnxruntime
+
+# CGAL configuration
+CGAL_DIR = $(CGAL_ROOT)
+CGAL_INCLUDE = -I$(CGAL_DIR)/include
+CGAL_LIBS = -L$(CGAL_DIR)/lib -lCGAL
+
+# GMP configuration
+GMP_DIR = $(GMP_ROOT)
+GMP_INCLUDE = -I$(GMP_DIR)/include
+GMP_LIBS = -L$(GMP_DIR)/lib -lgmp -lgmpxx
+
 # Combined flags
-ALL_INCLUDES = -I. $(ROOT_CFLAGS) $(PYTHIA8_INCLUDE) $(FASTJET_INCLUDE)
+ALL_INCLUDES = -I. $(ROOT_CFLAGS) $(PYTHIA8_INCLUDE) $(FASTJET_INCLUDE) $(ONNXRUNTIME_INCLUDE) $(CGAL_INCLUDE) $(GMP_INCLUDE)
 # Put FastJet first in the linking order
-ALL_LIBS = $(FASTJET_LIBS) $(ROOT_GLIBS) $(PYTHIA8_LIBS) -pthread -rdynamic
+ALL_LIBS = $(FASTJET_LIBS) $(ROOT_GLIBS) $(PYTHIA8_LIBS) $(ONNXRUNTIME_LIBS) $(CGAL_LIBS) $(GMP_LIBS) -pthread -rdynamic
 
 # Target executable
 TARGET = bjet_analysis
@@ -32,7 +47,7 @@ all: $(TARGET)
 
 # Main target
 $(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(ALL_INCLUDES) $(OBJECTS) -o $@ $(ALL_LIBS) -Wl,--no-as-needed
+	$(CXX) $(CXXFLAGS) $(ALL_INCLUDES) $(OBJECTS) -o $@ $(ALL_LIBS)
 
 # Explicit compilation rules for each source file
 bjet_analysis.o: bjet_analysis.cpp

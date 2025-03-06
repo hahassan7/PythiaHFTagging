@@ -70,7 +70,7 @@ def LoadInputData_MC(recreate, dataname, nJets):
             "svfE",
             "svIPxy",
             "svCPA",
-            "svChi2",
+            "svChi2PCA",
             "svDispersion",
             "svDecayLength2D",
             "svDecayLength3D"

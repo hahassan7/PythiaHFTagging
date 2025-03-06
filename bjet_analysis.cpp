@@ -1,6 +1,8 @@
 #include "TaggingUtilities.cpp"
 #include "JTreeHFFeatures.h"
 #include "JetTreeGenerator.h"
+#include "THnSparse.h"
+#include "TSystem.h"
 
 class BjetAnalysis
 {
@@ -102,6 +104,42 @@ public:
         // Add this with other histogram declarations
         TH1F *hPrimaryVertexZ = new TH1F("hPrimaryVertexZ", "Primary Vertex Z Position;z (cm);Counts", 100, -10, 10);
         TH1F *hPrimaryVertexZDiff = new TH1F("hPrimaryVertexZDiff", "Primary Vertex Z Position;z (cm);Counts", 1000, -5, 5);
+
+        // Define the number of dimensions and the binning for each dimension
+        const int nDims = 7;
+        int bins[nDims] = {200, 3, 500, 500, 100, 100, 100}; // Adjust bin numbers as needed
+        double xmin[nDims] = {0, 0, 0, 0, 0, 0, 0};
+        double xmax[nDims] = {200, 3, 1, 30, 100, 10, 1}; // Adjust ranges as needed
+
+        THnSparseF *hJetTaggingInfo = new THnSparseF("hJetTaggingInfo", "Jet information;jetpT;jetFlavor;Score;-log(1-score);jetMass;svMass;svfE", nDims, bins, xmin, xmax);
+
+        TH2F *hScoreVsJetPt_incl;
+        TH2F *hLogScoreVsJetPt_incl;
+
+        TH2F *hScoreVsJetPt_b;
+        TH2F *hLogScoreVsJetPt_b;
+
+        TH2F *hScoreVsJetPt_c;
+        TH2F *hLogScoreVsJetPt_c;
+
+        TH2F *hScoreVsJetPt_lf;
+        TH2F *hLogScoreVsJetPt_lf;
+
+        // 2D histograms for Score vs jet pT and -log(1-score) vs jet pT
+        if (mTreeGen->getDoPrediction())
+        {
+            hScoreVsJetPt_incl = new TH2F("h2_score_jetpT", "Score vs Jet pT (inclusive);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
+            hLogScoreVsJetPt_incl = new TH2F("h2_logscore_jetpT", "-log(1-Score) vs Jet pT (inclusive);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+
+            hScoreVsJetPt_b = new TH2F("h2_score_jetpT_bjet", "Score vs Jet pT (b-jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
+            hLogScoreVsJetPt_b = new TH2F("h2_logscore_jetpT_bjet", "-log(1-Score) vs Jet pT (b-jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+
+            hScoreVsJetPt_c = new TH2F("h2_score_jetpT_cjet", "Score vs Jet pT (c-jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
+            hLogScoreVsJetPt_c = new TH2F("h2_logscore_jetpT_cjet", "-log(1-Score) vs Jet pT (c-jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+
+            hScoreVsJetPt_lf = new TH2F("h2_score_jetpT_lfjet", "Score vs Jet pT (light-flavor jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
+            hLogScoreVsJetPt_lf = new TH2F("h2_logscore_jetpT_lfjet", "-log(1-Score) vs Jet pT (light-flavor jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+        }
 
         // Initialize Pythia with more detailed error checking
         logLocal(DebugLevel::INFO, "Initializing Pythia...");
@@ -503,6 +541,33 @@ public:
                             auto [jetparams, trackparams, svparams] = mTreeGen->processJetFeatures(jet, allTracks, secondaryVertices, primaryVertex);
                             auto output = mTreeGen->predict(jetparams, trackparams, svparams);
                             score = output[0];
+
+                            // Fill the THnSparse histogram
+                            double logScore = -log(1 - score);
+                            double svMass = secondaryVertices.empty() ? 0 : secondaryVertices[0].momentum.M();
+                            double svfE = secondaryVertices.empty() ? 0 : secondaryVertices[0].momentum.E() / jet.e();
+                            double values[nDims] = {jet.pt(), static_cast<double>(jetFlavor), score, logScore, jet.m(), svMass, svfE};
+                            hJetTaggingInfo->Fill(values);
+
+                            // Fill 2D histograms
+                            hScoreVsJetPt_incl->Fill(jet.pt(), score);
+                            hLogScoreVsJetPt_incl->Fill(jet.pt(), logScore);
+
+                            if (jetFlavor == JetTaggingSpecies::beauty)
+                            {
+                                hScoreVsJetPt_b->Fill(jet.pt(), score);
+                                hLogScoreVsJetPt_b->Fill(jet.pt(), logScore);
+                            }
+                            else if (jetFlavor == JetTaggingSpecies::charm)
+                            {
+                                hScoreVsJetPt_c->Fill(jet.pt(), score);
+                                hLogScoreVsJetPt_c->Fill(jet.pt(), logScore);
+                            }
+                            else
+                            {
+                                hScoreVsJetPt_lf->Fill(jet.pt(), score);
+                                hLogScoreVsJetPt_lf->Fill(jet.pt(), logScore);
+                            }
                         }
                         else
                         {
@@ -589,6 +654,45 @@ public:
         logLocal(DebugLevel::INFO, "\nWriting histograms...");
         if (outFile && outFile->IsOpen())
         {
+            if (pTHatmax > 0 || pTHatmin > 20)
+            {
+                hJetPt->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hNSVperJet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hNSVperJet_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hNSVperJet_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hSVMass->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hSVMass_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hSVMass_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hDecayLength2D->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hDecayLength2D_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hDecayLength2D_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hDecayLength3D->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hDecayLength3D_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hDecayLength3D_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hNConstituents->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hNConstituents_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                hNConstituents_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                if (mTreeGen->getDoPrediction())
+                {
+                    hJetTaggingInfo->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hLogScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hScoreVsJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hLogScoreVsJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hScoreVsJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hLogScoreVsJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hLogScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                }
+            }
+
+            outFile->cd();
+            if (mTreeGen->getDoPrediction())
+            {
+                hJetTaggingInfo->Write(); // Write the THnSparse histogram
+            }
             outFile->Write();
             outFile->Close();
         }
@@ -614,7 +718,7 @@ public:
     }
 };
 
-void bjet_analysis(int nEvents = 10000, double pTHatMin = 20, double pTHatMax = -1, std::string modelpath = "/Users/hadi/bjetAnalysisML/ML_bjets/Models/LHC24g4_40_70/model.onnx", DebugLevel debugLevel = DebugLevel::INFO)
+void bjet_analysis(int nEvents = 100000, double pTHatMin = 20, double pTHatMax = -1, std::string modelpath = "/Users/hadi/JYUMLProject/PythiaHFTagging/ML_bjets/Models/MB_Large/model.onnx", DebugLevel debugLevel = DebugLevel::INFO)
 {
     // Initialize features
     std::vector<std::string> features = {"jetpT", "jetEta", "jetPhi", "jetMass", "nTracks", "nSV", "jetFlavor",
@@ -686,7 +790,7 @@ int main(int argc, char *argv[])
                 pTHatMax = std::atoi(argv[++i]);
             }
         }
-        else if (arg == "-ml" | arg == "--modelPath")
+        else if (arg == "-ml" || arg == "--modelPath")
         {
             if (i + 1 < argc)
             {

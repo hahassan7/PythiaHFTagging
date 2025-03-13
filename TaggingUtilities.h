@@ -375,7 +375,7 @@ public:
 class SecondaryVertexFinder
 {
 private:
-    const double maxDCA = 1.0; // cm
+    const double maxDCA = 100.0; // cm
     const double maxChi2 = 5.0;
     const double minVtxSignif = 0.3;
     const double maxRadialDist = 10.0; // cm

@@ -17,13 +17,13 @@ void DrawTTreeVariables()
 
     std::vector<std::array<float, 3>> binningJet = {{200, 0, 700}, {100, -1.2, 1.2}, {100, 0, 3 * M_PI}, {200, 0, 200}, {100, 0, 100}, {200, 0, 5000}};
     std::vector<std::array<float, 3>> binningTrack = {{200, 0, 200}, {100, -1.2, 1.2}, {200, 0, 1000}, {200, 0, 1000}, {100, 0, 1}, {200, -5, 5}, {200, -5, 5}, {200, 0, 1.2}, {200, 0, 1}};
-    std::vector<std::array<float, 3>> binningSV = {{200, 0, 200}, {200, 0, 1}, {200, 0, 20}, {200, 0, 1.2}, {200, -1, 1}, {200, -1.2, 1.2}, {200, 0, 10}, {200, 0, 10}, {200, 0, 50}, {200, 0, 50}};
+    std::vector<std::array<float, 3>> binningSV = {{200, 0, 200}, {200, 0, 1}, {200, 0, 20}, {200, 0, 1.2}, {200, -1, 1}, {200, -1.2, 1.2}, {200, 0, 5}, {200, 0, 5}, {200, 0, 30}, {200, 0, 30}};
 
     // Track variables to plot
     const char *trackVariables[] = {"trackPt", "trackEta", "dotProdTrackJet", "dotProdTrackJetOverJet", "deltaRJetTrack", "signedIP2D", "signedIP3D", "momFraction", "deltaRTrackVertex"};
 
     // SV variables to plot
-    const char *svVariables[] = {"svPt", "deltaRSVJet", "svMass", "svfE", "svIPxy", "svCPA", "svChi2", "svDispersion", "svDecayLength2D", "svDecayLength3D"};
+    const char *svVariables[] = {"svPt", "deltaRSVJet", "svMass", "svfE", "svIPxy", "svCPA", "svChi2PCA", "svDispersion", "svDecayLength2D", "svDecayLength3D"};
 
     const int nVars = sizeof(variables) / sizeof(variables[0]);
     const int nTrackVars = sizeof(trackVariables) / sizeof(trackVariables[0]);
@@ -69,7 +69,7 @@ void DrawTTreeVariables()
             }
 
             leg->Draw();
-            c->SaveAs(Form("figures/TreeFigures/%s_comparison.png", varList[i]));
+            c->SaveAs(Form("figures/TreeFigures/MB/%s_comparison.png", varList[i]));
         }
     };
 

@@ -6,7 +6,7 @@ import sys, os
 import tensorflow as tf
 
 #### Settings
-recreateData            = False
+recreateData            = True
 checkData               = False
 trainModels             = True
 evalModel               = True

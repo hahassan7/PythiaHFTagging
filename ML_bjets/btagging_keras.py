@@ -443,7 +443,7 @@ class AliMLKerasModel_CallbackSaveModel(keras.callbacks.Callback):
     # Save the model on each epoch's end
     self.fSaveFunction()
     if self.fDoValidation:
-      learningRate = K.get_value(self.fmodel.optimizer.learning_rate.value)
+      learningRate = K.get_value(self.fModel.optimizer.learning_rate.value)
       self.fResults.AddResult(logs.get('loss'), logs.get('val_loss'), learningRate, self.fNEvents, logs.get('acc'), logs.get('val_acc'), self.fModel, self.fValidationData, self.fValidationTruth, self.fBatchSize)
 
 class AliMLKerasModel_EnhancedProgbarLogger(keras.callbacks.ProgbarLogger):

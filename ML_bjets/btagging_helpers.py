@@ -108,6 +108,7 @@ def LoadInputData_MC(recreate, dataname, nJets):
 
         # Replace infinite values with NaN and then replace NaNs with zeros
         data.replace([np.inf, -np.inf], np.nan, inplace=True)
+        data.replace([-999, 999, -99, 99], 0, inplace=True)
         data.fillna(0, inplace=True)
 
         # Save the data to the HDF5 store

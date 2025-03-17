@@ -1,4 +1,4 @@
-#include "TaggingUtilities.cpp"
+#include "TaggingUtilities.h"
 #include "JTreeHFFeatures.h"
 #include "JetTreeGenerator.h"
 #include "THnSparse.h"
@@ -70,12 +70,12 @@ public:
 
         // Create histograms
         // Basic jet kinematics
-        TH1F *hJetPt = new TH1F("hJetPt", "Jet p_{T};p_{T} (GeV/c);Counts", 100, 0, 100);
+        TH1F *hJetPt = new TH1F("hJetPt", "Jet p_{T};p_{T} (GeV/c);Counts", 200, 0, 200);
         TH1F *hJetEta = new TH1F("hJetEta", "Jet #eta;#eta;Counts", 100, -5, 5);
 
         // Flavor-specific jet pT
-        TH1F *hJetPt_b = new TH1F("hJetPt_b", "b-Jet p_{T};p_{T} (GeV/c);Counts", 100, 0, 100);
-        TH1F *hJetPt_c = new TH1F("hJetPt_c", "c-Jet p_{T};p_{T} (GeV/c);Counts", 100, 0, 100);
+        TH1F *hJetPt_b = new TH1F("hJetPt_b", "b-Jet p_{T};p_{T} (GeV/c);Counts", 200, 0, 200);
+        TH1F *hJetPt_c = new TH1F("hJetPt_c", "c-Jet p_{T};p_{T} (GeV/c);Counts", 200, 0, 200);
 
         // SV properties
         TH1F *hSVMass = new TH1F("hSVMass", "SV Mass (inclusive);Mass (GeV/c^{2});Counts", 100, 0, 10);
@@ -104,6 +104,19 @@ public:
         // Add this with other histogram declarations
         TH1F *hPrimaryVertexZ = new TH1F("hPrimaryVertexZ", "Primary Vertex Z Position;z (cm);Counts", 100, -10, 10);
         TH1F *hPrimaryVertexZDiff = new TH1F("hPrimaryVertexZDiff", "Primary Vertex Z Position;z (cm);Counts", 1000, -5, 5);
+
+        TH2D *hIPxyJetpTN2;
+        TH2D *hIPxyJetpTN3;
+
+        TH2D *hIPxyJetpTN2_bjet;
+        TH2D *hIPxyJetpTN3_bjet;
+
+        TH2D *hIPxyJetpTN2_cjet;
+        TH2D *hIPxyJetpTN3_cjet;
+
+        TH3D *hDecayLengthDispersionJetpT;
+        TH3D *hDecayLengthDispersionJetpT_bjet;
+        TH3D *hDecayLengthDispersionJetpT_cjet;
 
         // Define the number of dimensions and the binning for each dimension
         const int nDims = 7;
@@ -139,6 +152,19 @@ public:
 
             hScoreVsJetPt_lf = new TH2F("h2_score_jetpT_lfjet", "Score vs Jet pT (light-flavor jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
             hLogScoreVsJetPt_lf = new TH2F("h2_logscore_jetpT_lfjet", "-log(1-Score) vs Jet pT (light-flavor jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+
+            hIPxyJetpTN2 = new TH2D("h2IPxyJetpTN2", "IP_{xy} vs. Jet pT (inclusive)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPxyJetpTN3 = new TH2D("h2IPxyJetpTN3", "IP_{xy} vs. Jet pT (inclusive)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+
+            hIPxyJetpTN2_bjet = new TH2D("h2IPxyJetpTN2_bjet", "IP_{xy} vs. Jet pT (b-jets)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPxyJetpTN3_bjet = new TH2D("h2IPxyJetpTN3_bjet", "IP_{xy} vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+
+            hIPxyJetpTN2_cjet = new TH2D("h2IPxyJetpTN2_cjet", "IP_{xy} vs. Jet pT (c-jets)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPxyJetpTN3_cjet = new TH2D("h2IPxyJetpTN3_cjet", "IP_{xy} vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+
+            hDecayLengthDispersionJetpT = new TH3D("h3DecayLengthDispersionJetpT", "Decay Length vs. Dispersion vs. Jet pT (inclusive);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 300, 0, 30, 200, 0, 2);
+            hDecayLengthDispersionJetpT_bjet = new TH3D("h3DecayLengthDispersionJetpT_bjet", "Decay Length vs. Dispersion vs. Jet pT (b-jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 300, 0, 30, 200, 0, 2);
+            hDecayLengthDispersionJetpT_cjet = new TH3D("h3DecayLengthDispersionJetpT_cjet", "Decay Length vs. Dispersion vs. Jet pT (c-jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 300, 0, 30, 200, 0, 2);
         }
 
         // Initialize Pythia with more detailed error checking
@@ -553,6 +579,51 @@ public:
                             hScoreVsJetPt_incl->Fill(jet.pt(), score);
                             hLogScoreVsJetPt_incl->Fill(jet.pt(), logScore);
 
+                            if (trackparams[1].trackpT > 0)
+                            {
+                                hIPxyJetpTN2->Fill(jet.pt(), trackparams[1].signedIP3D);
+                            }
+                            if (trackparams[2].trackpT > 0)
+                            {
+                                hIPxyJetpTN3->Fill(jet.pt(), trackparams[2].signedIP3D);
+                            }
+                            if (svparams[0].svPt > 0)
+                            {
+                                hDecayLengthDispersionJetpT->Fill(jet.pt(), svparams[0].svDecayLength3D, svparams[0].svDispersion);
+                            }
+
+                            if (jetFlavor == JetTaggingSpecies::beauty)
+                            {
+
+                                if (trackparams[1].trackpT > 0)
+                                {
+                                    hIPxyJetpTN2_bjet->Fill(jet.pt(), trackparams[1].signedIP3D);
+                                }
+                                if (trackparams[2].trackpT > 0)
+                                {
+                                    hIPxyJetpTN3_bjet->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                }
+                                if (svparams[0].svPt > 0)
+                                {
+                                    hDecayLengthDispersionJetpT_bjet->Fill(jet.pt(), svparams[0].svDecayLength3D, svparams[0].svDispersion);
+                                }
+                            }
+                            else if (jetFlavor == JetTaggingSpecies::charm)
+                            {
+                                if (trackparams[1].trackpT > 0)
+                                {
+                                    hIPxyJetpTN2_cjet->Fill(jet.pt(), trackparams[1].signedIP3D);
+                                }
+                                if (trackparams[2].trackpT > 0)
+                                {
+                                    hIPxyJetpTN3_cjet->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                }
+                                if (svparams[0].svPt > 0)
+                                {
+                                    hDecayLengthDispersionJetpT_cjet->Fill(jet.pt(), svparams[0].svDecayLength3D, svparams[0].svDispersion);
+                                }
+                            }
+
                             if (jetFlavor == JetTaggingSpecies::beauty)
                             {
                                 hScoreVsJetPt_b->Fill(jet.pt(), score);
@@ -718,7 +789,7 @@ public:
     }
 };
 
-void bjet_analysis(int nEvents = 100000, double pTHatMin = 20, double pTHatMax = -1, std::string modelpath = "/Users/hadi/JYUMLProject/PythiaHFTagging/ML_bjets/Models/MB_Large/model.onnx", DebugLevel debugLevel = DebugLevel::INFO)
+void bjet_analysis(int nEvents = 10000, double pTHatMin = 20, double pTHatMax = -1, std::string modelpath = "", DebugLevel debugLevel = DebugLevel::INFO)
 {
     // Initialize features
     std::vector<std::string> features = {"jetpT", "jetEta", "jetPhi", "jetMass", "nTracks", "nSV", "jetFlavor",

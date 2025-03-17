@@ -230,6 +230,20 @@ public:
     }
   }
 
+  template <typename T>
+  static int replaceNaN(std::vector<T>& vec, T value)
+  {
+    int numNaN = 0;
+    for (auto& el : vec) {
+      if (std::isnan(el) || std::isinf(el) || std::abs(el) == 99 || std::abs(el) == 999) {
+        el = value;
+        ++numNaN;
+      }
+    }
+    return numNaN;
+  }
+
+
   /// Method to get the input features vector needed for ML inference in a 2D vector
   /// \param jet is the b-jet candidate
   /// \param tracks is the vector of tracks associated to the jet
@@ -247,6 +261,10 @@ public:
 
     std::vector<std::vector<float>> inputFeatures;
 
+    replaceNaN(jetInput, 0.f);
+    replaceNaN(trackInput, 0.f);
+    replaceNaN(svInput, 0.f);
+    
     inputFeatures.push_back(jetInput);
     inputFeatures.push_back(trackInput);
     inputFeatures.push_back(svInput);
@@ -274,6 +292,8 @@ public:
     inputFeatures.insert(inputFeatures.end(), jetInput.begin(), jetInput.end());
     inputFeatures.insert(inputFeatures.end(), trackInput.begin(), trackInput.end());
     inputFeatures.insert(inputFeatures.end(), svInput.begin(), svInput.end());
+
+    replaceNaN(inputFeatures, 0.f);
 
     return inputFeatures;
   }

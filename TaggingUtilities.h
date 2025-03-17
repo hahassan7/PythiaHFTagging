@@ -18,7 +18,8 @@
 
 // ROOT headers
 #include "TH1F.h"
-#include "TH2F.h"
+#include "TH2.h"
+#include "TH3.h"
 #include "TFile.h"
 #include "TVector3.h"
 #include "TRandom3.h"

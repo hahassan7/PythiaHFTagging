@@ -18,6 +18,14 @@ private:
     std::unique_ptr<JetModel<N>> mMLModel;
     DebugLevel mDebugLevel;
     bool mDoPrediction = false;
+    const double minTrack = 0.5; // Minimum track pT for track selection
+    const double maxDCAxy = 1.0; // Maximum DCAxy for track selection
+    const double maxDCAz = 2.0;  // Maximum DCAz for track selection
+
+    bool passesCuts(const Track &track)
+    {
+        return track.pt() > minTrack && std::abs(track.getDCAxy()) < maxDCAxy && std::abs(track.getDCAz()) < maxDCAz;
+    }
 
 public:
     JetTreeGenerator(const char *filename, std::vector<std::string> features, DebugLevel debugLevel = DebugLevel::INFO)
@@ -116,7 +124,10 @@ public:
             size_t trackIndex = constituents[iTrack].user_index();
             if (trackIndex < allTracks.size())
             {
-                sortedTracks.push_back(allTracks[trackIndex]); // Add track to the sorted list
+                if (passesCuts(allTracks[trackIndex]))
+                {
+                    sortedTracks.push_back(allTracks[trackIndex]); // Add track to the sorted list
+                }
             }
         }
 
@@ -235,7 +246,10 @@ public:
             size_t trackIndex = constituents[iTrack].user_index();
             if (trackIndex < allTracks.size())
             {
-                sortedTracks.push_back(allTracks[trackIndex]); // Add track to the sorted list
+                if (passesCuts(allTracks[trackIndex]))
+                {
+                    sortedTracks.push_back(allTracks[trackIndex]); // Add track to the sorted list
+                }
             }
         }
 

@@ -59,10 +59,10 @@ struct HFjetTree
         mDotProdTrackJet.fill(0);
         mDotProdTrackJetOverJet.fill(0);
         mDeltaRJetTrack.fill(-1);
-        mSignedIP2D.fill(-999);
-        mSignedIP2DSign.fill(-999);
-        mSignedIP3D.fill(-999);
-        mSignedIP3DSign.fill(-999);
+        mSignedIP2D.fill(-99);
+        mSignedIP2DSign.fill(-99);
+        mSignedIP3D.fill(-99);
+        mSignedIP3DSign.fill(-99);
         mMomFraction.fill(0);
         mDeltaRTrackVertex.fill(-1);
 

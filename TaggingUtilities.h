@@ -376,11 +376,13 @@ class SecondaryVertexFinder
 {
 private:
     const double maxDCA = 100.0; // cm
-    const double maxChi2 = 5.0;
+    const double maxChi2 = 20.0;
     const double minVtxSignif = 0.3;
     const double maxRadialDist = 10.0; // cm
     const double maxZDist = 12.0;      // cm
     const double minTrackPt = 0.3;     // GeV/c
+    const double maxDCAxy = 100.0;       // cm
+    const double maxDCAz = 100.0;        // cm
     const double minSVPt = 1.0;        // GeV
     DebugLevel debugLevel;
 
@@ -606,6 +608,10 @@ private:
         // Check track pT
         if (track.pt() <= minTrackPt)
             return false;
+
+        if (std::abs(track.getDCAxy()) > maxDCAxy || std::abs(track.getDCAz()) > maxDCAz) {
+            return false;
+        }
 
         return true;
     }

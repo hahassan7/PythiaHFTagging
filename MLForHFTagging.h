@@ -44,8 +44,8 @@
 struct BJetParams
 {
   float jetpT = 0.0;
-  float jetEta = -99;
-  float jetPhi = -99;
+  float jetEta = 0.0;
+  float jetPhi = 0.0;
   int nTracks = -1;
   int nSV = -1;
   float jetMass = 0.0;
@@ -54,14 +54,14 @@ struct BJetParams
 struct BJetTrackParams
 {
   double trackpT = 0.0;
-  double trackEta = -99;
+  double trackEta = 0.0;
   double dotProdTrackJet = 0.0;
   double dotProdTrackJetOverJet = 0.0;
   double deltaRJetTrack = -1;
-  double signedIP2D = -999;
-  double signedIP2DSign = -999;
-  double signedIP3D = -999;
-  double signedIP3DSign = -999;
+  double signedIP2D =0.0;
+  double signedIP2DSign =0.0;
+  double signedIP3D = 0.0;
+  double signedIP3DSign = 0.0;
   double momFraction = 0.0;
   double deltaRTrackVertex = -1;
   double trackPhi = 0.0;
@@ -81,14 +81,14 @@ struct BJetSVParams
   double deltaRSVJet = -1;
   double svMass = 0.0;
   double svfE = 0.0;
-  double svIPxy = -999;
-  double svCPA = -999;
-  double svChi2PCA = 99;
-  double svDispersion = 99;
-  double svDecayLength2D = -999;
-  double svDecayLength2DError = -999;
-  double svDecayLength3D = -999;
-  double svDecayLength3DError = -999;
+  double svIPxy = 0.0;
+  double svCPA = 0.0;
+  double svChi2PCA = 0.0;
+  double svDispersion = 0.0;
+  double svDecayLength2D = 0.0;
+  double svDecayLength2DError = 0.0;
+  double svDecayLength3D = 0.0;
+  double svDecayLength3DError = 0.0;
 };
 
 enum class InputFeaturesBTag : uint8_t

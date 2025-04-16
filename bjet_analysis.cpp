@@ -28,7 +28,7 @@ public:
     {
     }
 
-    void analyze(int nEvents = 10000, double pTHatmin = 20, double pTHatmax = -1)
+    void analyze(int nEvents = 10000, double pTHatmin = 20, double pTHatmax = -1, bool writeTHnSpase = false)
     {
         auto logLocal = [this](DebugLevel level, const std::string &message)
         {
@@ -107,16 +107,26 @@ public:
 
         TH2D *hIPxyJetpTN2;
         TH2D *hIPxyJetpTN3;
+        TH2D *hIPzJetpTN3;
+        TH2D *hIPJetpTN3;
 
         TH2D *hIPxyJetpTN2_bjet;
         TH2D *hIPxyJetpTN3_bjet;
+        TH2D *hIPzJetpTN3_bjet;
+        TH2D *hIPJetpTN3_bjet;
 
         TH2D *hIPxyJetpTN2_cjet;
         TH2D *hIPxyJetpTN3_cjet;
+        TH2D *hIPzJetpTN3_cjet;
+        TH2D *hIPJetpTN3_cjet;
 
         TH3D *hDecayLengthDispersionJetpT;
         TH3D *hDecayLengthDispersionJetpT_bjet;
         TH3D *hDecayLengthDispersionJetpT_cjet;
+
+        TH2D *hCPAvsJetpT;
+        TH2D *hCPAvsJetpT_bjet;
+        TH2D *hCPAvsJetpT_cjet;
 
         // Define the number of dimensions and the binning for each dimension
         const int nDims = 7;
@@ -155,16 +165,26 @@ public:
 
             hIPxyJetpTN2 = new TH2D("h2IPxyJetpTN2", "IP_{xy} vs. Jet pT (inclusive)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
             hIPxyJetpTN3 = new TH2D("h2IPxyJetpTN3", "IP_{xy} vs. Jet pT (inclusive)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPzJetpTN3 = new TH2D("h2IPzJetpTN3", "IP_{z} vs. Jet pT (inclusive)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPJetpTN3 = new TH2D("h2IPJetpTN3", "IP vs. Jet pT (inclusive)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 350, -1.2, 1.2);
 
             hIPxyJetpTN2_bjet = new TH2D("h2IPxyJetpTN2_bjet", "IP_{xy} vs. Jet pT (b-jets)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
             hIPxyJetpTN3_bjet = new TH2D("h2IPxyJetpTN3_bjet", "IP_{xy} vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPzJetpTN3_bjet = new TH2D("h2IPzJetpTN3_bjet", "IP_{z} vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPJetpTN3_bjet = new TH2D("h2IPJetpTN3_bjet", "IP vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 350, -1.2, 1.2);
 
             hIPxyJetpTN2_cjet = new TH2D("h2IPxyJetpTN2_cjet", "IP_{xy} vs. Jet pT (c-jets)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
             hIPxyJetpTN3_cjet = new TH2D("h2IPxyJetpTN3_cjet", "IP_{xy} vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPzJetpTN3_cjet = new TH2D("h2IPzJetpTN3_cjet", "IP_{z} vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPJetpTN3_cjet = new TH2D("h2IPJetpTN3_cjet", "IP vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 350, -1.2, 1.2);
 
-            hDecayLengthDispersionJetpT = new TH3D("h3DecayLengthDispersionJetpT", "Decay Length vs. Dispersion vs. Jet pT (inclusive);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 300, 0, 30, 200, 0, 2);
-            hDecayLengthDispersionJetpT_bjet = new TH3D("h3DecayLengthDispersionJetpT_bjet", "Decay Length vs. Dispersion vs. Jet pT (b-jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 300, 0, 30, 200, 0, 2);
-            hDecayLengthDispersionJetpT_cjet = new TH3D("h3DecayLengthDispersionJetpT_cjet", "Decay Length vs. Dispersion vs. Jet pT (c-jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 300, 0, 30, 200, 0, 2);
+            hDecayLengthDispersionJetpT = new TH3D("h3DecayLengthDispersionJetpT", "Decay Length vs. Dispersion vs. Jet pT (inclusive);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 600, 0, 30, 200, 0, 2);
+            hDecayLengthDispersionJetpT_bjet = new TH3D("h3DecayLengthDispersionJetpT_bjet", "Decay Length vs. Dispersion vs. Jet pT (b-jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 600, 0, 30, 200, 0, 2);
+            hDecayLengthDispersionJetpT_cjet = new TH3D("h3DecayLengthDispersionJetpT_cjet", "Decay Length vs. Dispersion vs. Jet pT (c-jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 600, 0, 30, 200, 0, 2);
+
+            hCPAvsJetpT = new TH2D("hCPAvsJetpT", "CPA vs. Jet pT (inclusive);Jet pT (GeV/c);CPA", 200, 0, 200, 210, -1.05, 1.05);
+            hCPAvsJetpT_bjet = new TH2D("hCPAvsJetpT_bjet", "CPA vs. Jet pT (b-jets);Jet pT (GeV/c);CPA", 200, 0, 200, 210, -1.05, 1.05);
+            hCPAvsJetpT_cjet = new TH2D("hCPAvsJetpT_cjet", "CPA vs. Jet pT (c-jets);Jet pT (GeV/c);CPA", 200, 0, 200, 210, -1.05, 1.05);
         }
 
         // Initialize Pythia with more detailed error checking
@@ -573,7 +593,12 @@ public:
                             double svMass = secondaryVertices.empty() ? 0 : secondaryVertices[0].momentum.M();
                             double svfE = secondaryVertices.empty() ? 0 : secondaryVertices[0].momentum.E() / jet.e();
                             double values[nDims] = {jet.pt(), static_cast<double>(jetFlavor), score, logScore, jet.m(), svMass, svfE};
-                            hJetTaggingInfo->Fill(values);
+
+                            // Fill the THnSparse histogram
+                            if (writeTHnSpase)
+                            {
+                                hJetTaggingInfo->Fill(values);
+                            }
 
                             // Fill 2D histograms
                             hScoreVsJetPt_incl->Fill(jet.pt(), score);
@@ -581,15 +606,18 @@ public:
 
                             if (trackparams[1].trackpT > 0)
                             {
-                                hIPxyJetpTN2->Fill(jet.pt(), trackparams[1].signedIP3D);
+                                hIPxyJetpTN2->Fill(jet.pt(), std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D));
                             }
                             if (trackparams[2].trackpT > 0)
                             {
-                                hIPxyJetpTN3->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                hIPJetpTN3->Fill(jet.pt(), std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D));
+                                hIPzJetpTN3->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                hIPxyJetpTN3->Fill(jet.pt(), trackparams[2].signedIP2D);
                             }
                             if (svparams[0].svPt > 0)
                             {
                                 hDecayLengthDispersionJetpT->Fill(jet.pt(), svparams[0].svDecayLength3D, svparams[0].svDispersion);
+                                hCPAvsJetpT->Fill(jet.pt(), svparams[0].svCPA);
                             }
 
                             if (jetFlavor == JetTaggingSpecies::beauty)
@@ -597,30 +625,36 @@ public:
 
                                 if (trackparams[1].trackpT > 0)
                                 {
-                                    hIPxyJetpTN2_bjet->Fill(jet.pt(), trackparams[1].signedIP3D);
+                                    hIPxyJetpTN2_bjet->Fill(jet.pt(), std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D));
                                 }
                                 if (trackparams[2].trackpT > 0)
                                 {
-                                    hIPxyJetpTN3_bjet->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                    hIPJetpTN3_bjet->Fill(jet.pt(), std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D));
+                                    hIPzJetpTN3_bjet->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                    hIPxyJetpTN3_bjet->Fill(jet.pt(), trackparams[2].signedIP2D);
                                 }
                                 if (svparams[0].svPt > 0)
                                 {
                                     hDecayLengthDispersionJetpT_bjet->Fill(jet.pt(), svparams[0].svDecayLength3D, svparams[0].svDispersion);
+                                    hCPAvsJetpT_bjet->Fill(jet.pt(), svparams[0].svCPA);
                                 }
                             }
                             else if (jetFlavor == JetTaggingSpecies::charm)
                             {
                                 if (trackparams[1].trackpT > 0)
                                 {
-                                    hIPxyJetpTN2_cjet->Fill(jet.pt(), trackparams[1].signedIP3D);
+                                    hIPxyJetpTN2_cjet->Fill(jet.pt(), std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D));
                                 }
                                 if (trackparams[2].trackpT > 0)
                                 {
-                                    hIPxyJetpTN3_cjet->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                    hIPJetpTN3_cjet->Fill(jet.pt(), std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D));
+                                    hIPzJetpTN3_cjet->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                    hIPxyJetpTN3_cjet->Fill(jet.pt(), trackparams[2].signedIP2D);
                                 }
                                 if (svparams[0].svPt > 0)
                                 {
                                     hDecayLengthDispersionJetpT_cjet->Fill(jet.pt(), svparams[0].svDecayLength3D, svparams[0].svDispersion);
+                                    hCPAvsJetpT_cjet->Fill(jet.pt(), svparams[0].svCPA);
                                 }
                             }
 
@@ -747,7 +781,9 @@ public:
                 hNConstituents_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                 if (mTreeGen->getDoPrediction())
                 {
-                    hJetTaggingInfo->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    if (writeTHnSpase) {
+                        hJetTaggingInfo->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    }
                     hScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hLogScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hScoreVsJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
@@ -756,11 +792,29 @@ public:
                     hLogScoreVsJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hLogScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPxyJetpTN2->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPxyJetpTN2_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPxyJetpTN2_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPxyJetpTN3->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPxyJetpTN3_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPxyJetpTN3_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPzJetpTN3->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPzJetpTN3_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPzJetpTN3_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPJetpTN3->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPJetpTN3_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPJetpTN3_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hDecayLengthDispersionJetpT->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hDecayLengthDispersionJetpT_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hDecayLengthDispersionJetpT_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hCPAvsJetpT->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hCPAvsJetpT_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hCPAvsJetpT_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                 }
             }
 
             outFile->cd();
-            if (mTreeGen->getDoPrediction())
+            if (mTreeGen->getDoPrediction() && writeTHnSpase)
             {
                 hJetTaggingInfo->Write(); // Write the THnSparse histogram
             }

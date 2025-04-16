@@ -108,6 +108,7 @@ def LoadInputData_MC(recreate, dataname, nJets):
 
         # Replace infinite values with NaN and then replace NaNs with zeros
         data.replace([np.inf, -np.inf], np.nan, inplace=True)
+        # Initialize the missing values with zeros. The effect was distorting the performance of the model
         data.replace([-999, 999, -99, 99], 0, inplace=True)
         data.fillna(0, inplace=True)
 

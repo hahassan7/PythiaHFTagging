@@ -152,7 +152,6 @@ def EvaluateModelPerformance(model, data_in, name, minpT, maxpT):
     score_B  = myModel.fModel.predict(X_test_B, batch_size=512, verbose=0)
     score_C  = myModel.fModel.predict(X_test_C, batch_size=512, verbose=0)
     score_LF = myModel.fModel.predict(X_test_LF, batch_size=512, verbose=0)
-    y_pred_combined = numpy.argmax(score_combined, axis=1)
 
   threshold = GetScoreThreshold(score_B, 0.6)
   print('\n##########################')
@@ -167,6 +166,7 @@ def EvaluateModelPerformance(model, data_in, name, minpT, maxpT):
   SaveHistogram('./Results/{}/{:s}-Scores.png'.format(name, model), 'Scores on validation data', tuple([score_B, score_C, score_LF]), ('B','C', "light flavor"), rangex=(0,1), logY=True)
 
   # Save confusion matrix
+  y_pred_combined = (score_combined >= threshold).astype(int)
   SaveConfusionMatrix(truth_test_combined, y_pred_combined, classes=['Light/Charm jets', 'Beauty jets'], fname='./Results/{}/{:s}-ConfusionMatrix.png'.format(name, model))
 
 
@@ -214,7 +214,7 @@ def SaveConfusionMatrix(y_true, y_pred, classes, fname, normalize=False, title='
     plt.title(title)
     plt.xlabel('Predicted label')
     plt.ylabel('True label')
-    plt.savefig(fname, dpi=300)
+    plt.savefig(fname, dpi=480)
     plt.close()
 
 #########################################################
@@ -249,7 +249,7 @@ def FitKerasModel(data, val_data, dataname="", verbose=True):
   myModel.PrintProperties()
 
   ### Train model
-  myModel.TrainModel(X_train, y_train, X_test, y_test, numEpochs = 300)
+  myModel.TrainModel(X_train, y_train, X_test, y_test, numEpochs = 10)
   myModel.SaveModel()
 
 

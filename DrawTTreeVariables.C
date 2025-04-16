@@ -9,7 +9,9 @@ void DrawTTreeVariables()
 {
     bool drawFeatures = false;
     bool drawEff = true;
+
     gStyle->SetOptStat(0);
+    gStyle->SetOptTitle(0);
 
     // Open the ROOT file and retrieve the TTree
     TFile *file = TFile::Open("ML_bjets/Data/MergedTTree_pTHardBins.root");
@@ -44,21 +46,28 @@ void DrawTTreeVariables()
     int colors[] = {kBlue, kGreen, kRed};
 
     // Helper function to draw variables
-    auto drawVariables = [&](const char *varList[], int nVars, std::vector<std::array<float, 3>> binning)
+    auto drawVariables = [&](const char *varList[], int nVars, std::vector<std::array<float, 3>> binning, std::string title[] = {}, std::string cuts = "")
     {
         for (int i = 0; i < nVars; ++i)
         {
-            TCanvas *c = new TCanvas(varList[i], varList[i], 800, 600);
+            TCanvas *c = new TCanvas(varList[i], varList[i], 800, 800);
             c->SetLogy(); // Set log scale on Y-axis
+            gPad->SetMargin(0.1, 0.01, 0.1, 0.01);
+            gPad->SetTicks(1, 1);
             TLegend *leg = new TLegend(0.6, 0.7, 0.8, 0.9);
 
+            if (title[i] == "")
+            {
+                title[i] = varList[i];
+            }
+            
             for (int j = 0; j < nFlavors; ++j)
             {
                 TString hname = Form("h_%s_flavor%d", varList[i], flavors[j]);
-                TH1F *h = new TH1F(hname, varList[i], binning[i][0], binning[i][1], binning[i][2]);
+                TH1F *h = new TH1F(hname, title[i].c_str(), binning[i][0], binning[i][1], binning[i][2]);
 
                 TString drawCmd = Form("%s >> %s", varList[i], hname.Data());
-                TString cut = Form("jetFlavor == %d && jetPt > 10  && jetPt < 200 && trackPt > 0 && svPt > 0", flavors[j]);
+                TString cut = Form("jetFlavor == %d && jetPt > 40  && jetPt < 70 %s", flavors[j], cuts.c_str());
 
                 tree->Draw(drawCmd, cut, "same");
 
@@ -76,7 +85,7 @@ void DrawTTreeVariables()
             }
 
             leg->Draw();
-            c->SaveAs(Form("figures/TreeFigures/%s_comparison.png", varList[i]));
+            c->SaveAs(Form("figures/TreeFigures/%s_comparison.png", title[i].c_str()));
         }
     };
 
@@ -91,7 +100,7 @@ void DrawTTreeVariables()
     // Optional block to create histograms, apply cuts, and draw ratios
     auto drawRatios = [&](const char *cutCondition, const char *cutName)
     {
-        TCanvas *c = new TCanvas(Form("c_%s", cutName), Form("Jet pT Ratios with %s Cut", cutName), 800, 600);
+        TCanvas *c = new TCanvas(Form("c_%s", cutName), Form("Jet pT Ratios with %s Cut", cutName), 800, 800);
         TLegend *leg = new TLegend(0.6, 0.7, 0.8, 0.9);
 
         for (int j = 0; j < nFlavors; ++j)
@@ -139,7 +148,23 @@ void DrawTTreeVariables()
     {
         drawRatios("svDecayLength3D[0] > 0.5 && svDispersion[0] < 0.03", "svDecayLength3D");
         drawRatios("TMath::Sqrt(signedIP2D[2]*signedIP2D[2] + signedIP3D[2]*signedIP3D[2]) > 0.008", "signedIP3D");
-        drawRatios("signedIP2D[1] > 0.008", "signedIP2D");
+        drawRatios("signedIP2D[2] > 0.008", "signedIP2D");
+
+        std::vector<std::array<float, 3>> binningTrackIP = {{100, -1, 1}, {100, -1, 1}};
+        std::vector<std::array<float, 3>> binningSVDL = {{100, -1, 1}, {100, 0, 20}};
+    
+        // Track variables to plot
+        const char *trackVariablesIP[] = {"signedIP2D[2]", "signedIP3D[2]"};
+        std::string trackVariablesIP_Title[] = {"DCA distribution;DCA_{xy} [cm];Probability Distribution", "DCA distribution;DCA_{z} [cm];Probability Distribution"};
+        std::string trackCuts = "&& trackPt[2] > 0";
+
+        // SV variables to plot
+        const char *svVariablesDL[] = {"svCPA[0]", "svDecayLength3D[0]"};
+        std::string svVariablesDL_Title[] = {"CPA distribution;CPA;Probability Distribution", "Decay Length distribution;Decay Length [cm];Probability Distribution"};
+        std::string svCuts = "&& svPt[0] > 0 && svDispersion[0] < 0.03";
+
+        drawVariables(trackVariablesIP, 2, binningTrackIP, trackVariablesIP_Title, trackCuts);
+        drawVariables(svVariablesDL, 2, binningSVDL, svVariablesDL_Title, svCuts);
     }
 
     // file->Close();

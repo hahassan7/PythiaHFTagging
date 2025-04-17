@@ -15,7 +15,7 @@ void Paper(bool saveFigs = false)
     gStyle->SetOptStat(0);
     gStyle->SetOptTitle(0);
 
-    TFile *inputFile = TFile::Open("Results_pTHat_ML.root");
+    TFile *inputFile = TFile::Open("OutputFiles/Results_pTHat_ML_New.root");
     if (!inputFile || inputFile->IsZombie())
     {
         std::cerr << "Error opening file!" << std::endl;
@@ -28,7 +28,8 @@ void Paper(bool saveFigs = false)
     std::array<float, 16> workingPoints = {0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 7, 8};
     std::array<double, 6> binning = {5, 10, 20, 40, 70, 200};
 
-    EColor mycolors[] = {kBlack, kRed, kGreen, kMagenta, kBlue, kGray, kOrange, kCyan};
+    // EColor mycolors[] = {kBlack, kRed, kGreen, kMagenta, kBlue, kGray, kOrange, kCyan};
+    Color_t mycolors[] = {kAzure + 4, kOrange + 7, kTeal + 3, kViolet - 5, kSpring - 8};
 
     // Define tagging TGraphs
     TGraph *bjet_taggingGraph[5];
@@ -79,30 +80,38 @@ void Paper(bool saveFigs = false)
 
     TCanvas *c1 = new TCanvas("c1", "Purity vs Efficiency", 800, 800);
     c1->cd();
-    gPad->SetGridx();
-    gPad->SetGridy();
+    // gPad->SetGridx();
+    // gPad->SetGridy();
     gPad->SetTicks();
     gPad->SetMargin(0.1, 0.01, 0.1, 0.01);
-    TH2D *hTemp1 = new TH2D("htemp1", "htemp;Efficiency;Purity", 1, 0, 1, 1, 0, 1);
+    TH2D *hTemp1 = new TH2D("htemp1", "htemp;b-jet tagging efficiency;b-jet purity", 1, 0, 1, 1, 0, 1.5);
+    hTemp1->GetYaxis()->SetTitleSize(0.045);
+    hTemp1->GetYaxis()->SetTitleOffset(1.1);
+    hTemp1->GetXaxis()->SetTitleSize(0.045);
+    hTemp1->GetXaxis()->SetTitleOffset(0.9);
 
     hTemp1->Draw();
-    TLegend *leg = new TLegend(0.14, 0.14, 0.44, 0.42);
+    TLegend *leg = new TLegend(0.54, 0.67, 0.86, 0.96);
+    leg->SetTextSizePixels(26);
     leg->SetLineWidth(0);
     // leg->SetFillStyle(0);
     for (size_t ibin = 0; ibin < binning.size() - 1; ibin++)
     {
         bjet_taggingGraph[ibin]->SetLineColor(mycolors[ibin]);
         bjet_taggingGraph[ibin]->SetMarkerColor(mycolors[ibin]);
-        bjet_taggingGraph[ibin]->SetMarkerStyle(21);
+        bjet_taggingGraph[ibin]->SetMarkerStyle(0);
         bjet_taggingGraph[ibin]->Draw("same");
-        leg->AddEntry(bjet_taggingGraph[ibin], Form("#it{p}_{T}^{jet} : %.f - %.f GeV/#it{c}", binning[ibin], binning[ibin + 1]));
+        // leg->AddEntry(bjet_taggingGraph[ibin], Form("#it{p}_{T}^{jet} : %.f - %.f GeV/#it{c}", binning[ibin], binning[ibin + 1]));
+        leg->AddEntry(bjet_taggingGraph[ibin], Form("%.f#kern[-0.5]{ }#leq#kern[-0.5]{ }#it{p}_{T,ch jet} < %.f GeV/#it{c}", binning[ibin], binning[ibin + 1]));
     }
     leg->Draw();
 
     TLatex *textpp = new TLatex();
-    textpp->SetTextSizePixels(25);
-    textpp->DrawLatexNDC(0.6, 0.94, "PYTHIA8 pp #sqrt{#it{s}} = 13 TeV");
-    textpp->DrawLatexNDC(0.57, 0.89, "Anti-#it{k}_{T} jet, #it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
+    textpp->SetTextFont(42);
+    textpp->SetTextSizePixels(27);
+    textpp->DrawLatexNDC(0.14, 0.93, "PYTHIA 8, pp,#kern[-0.5]{ }#sqrt{#it{s}} = 13 TeV");
+    textpp->DrawLatexNDC(0.14, 0.885, "Charged-particle jets");
+    textpp->DrawLatexNDC(0.14, 0.84, "Anti-#it{k}_{T},#kern[-0.5]{ }#it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
 
     if (saveFigs)
     {
@@ -112,11 +121,11 @@ void Paper(bool saveFigs = false)
     // Plot score distributions for different jet flavors
     TCanvas *c2 = new TCanvas("c2", "Score Distributions", 800, 800);
     c2->cd();
-    gPad->SetGridx();
-    gPad->SetGridy();
+    // gPad->SetGridx();
+    // gPad->SetGridy();
     gPad->SetTicks();
     gPad->SetLogy();
-    gPad->SetMargin(0.1, 0.01, 0.1, 0.01);
+    gPad->SetMargin(0.11, 0.02, 0.1, 0.01);
 
     int mainBin = 3;
 
@@ -125,34 +134,50 @@ void Paper(bool saveFigs = false)
     TH1D *hScore_cjet = cjetScore_pT->ProjectionY(Form("hScore_cjet_ibin%d", (int)mainBin), cjetScore_pT->GetXaxis()->FindBin(binning[mainBin]), cjetScore_pT->GetXaxis()->FindBin(binning[mainBin + 1]));
     TH1D *hScore_lfjet = lfjetScore_pT->ProjectionY(Form("hScore_ljet_ibin%d", (int)mainBin), lfjetScore_pT->GetXaxis()->FindBin(binning[mainBin]), lfjetScore_pT->GetXaxis()->FindBin(binning[mainBin + 1]));
 
-    hScore_incl->Rebin(2);
-    hScore_bjet->Rebin(2);
-    hScore_cjet->Rebin(2);
-    hScore_lfjet->Rebin(2);
+    // hScore_incl->Rebin(2);
+    // hScore_bjet->Rebin(2);
+    // hScore_cjet->Rebin(2);
+    // hScore_lfjet->Rebin(2);
 
     hScore_incl->SetLineColor(kBlack);
     hScore_bjet->SetLineColor(kRed);
-    hScore_cjet->SetLineColor(kGreen);
+    hScore_cjet->SetLineColor(kGreen + 2);
     hScore_lfjet->SetLineColor(kBlue);
 
+    hScore_incl->GetXaxis()->SetRangeUser(0, 20);
+    hScore_incl->GetXaxis()->SetTitle("#minus^{}ln(1#kern[-0.5]{ }#minus Score)");
+    hScore_incl->GetYaxis()->SetTitle("Probability density");
+    hScore_incl->GetYaxis()->SetTitleSize(0.045);
+    hScore_incl->GetYaxis()->SetTitleOffset(1.2);
+    hScore_incl->GetXaxis()->SetTitleSize(0.045);
+    hScore_incl->GetXaxis()->SetTitleOffset(0.9);
     hScore_incl->SetLineWidth(2);
     hScore_bjet->SetLineWidth(2);
     hScore_cjet->SetLineWidth(2);
     hScore_lfjet->SetLineWidth(2);
 
-    // hScore_incl->GetYaxis()->SetRangeUser(1e-9, hScore_incl->GetMaximum() * 2);
-    hScore_incl->GetXaxis()->SetRangeUser(0, 20);
+    hScore_bjet->Scale(1.0 / hScore_incl->Integral());
+    hScore_cjet->Scale(1.0 / hScore_incl->Integral());
+    hScore_lfjet->Scale(1.0 / hScore_incl->Integral());
+    hScore_incl->Scale(1.0 / hScore_incl->Integral());
+
     hScore_incl->Draw("HIST");
     hScore_bjet->Draw("HIST SAME");
     hScore_cjet->Draw("HIST SAME");
     hScore_lfjet->Draw("HIST SAME");
 
-    TLegend *leg2 = new TLegend(0.6, 0.7, 0.9, 0.9);
-    leg2->AddEntry(hScore_incl, "Inclusive Jets", "l");
-    leg2->AddEntry(hScore_bjet, "b-Jets", "l");
-    leg2->AddEntry(hScore_cjet, "c-Jets", "l");
-    leg2->AddEntry(hScore_lfjet, "Light Flavor Jets", "l");
+    TLegend *leg2 = new TLegend(0.57, 0.46, 0.91, 0.66);
+    leg2->SetLineWidth(0);
+    leg2->AddEntry(hScore_incl, "inclusive jets", "l");
+    leg2->AddEntry(hScore_bjet, "beauty jets", "l");
+    leg2->AddEntry(hScore_cjet, "charm jets", "l");
+    leg2->AddEntry(hScore_lfjet, "light-flavor jets", "l");
     leg2->Draw();
+
+    textpp->DrawLatexNDC(0.55, 0.93, "PYTHIA 8, pp,#kern[-0.5]{ }#sqrt{#it{s}} = 13 TeV");
+    textpp->DrawLatexNDC(0.55, 0.885, "Charged-particle jets");
+    textpp->DrawLatexNDC(0.55, 0.84, "Anti-#it{k}_{T},#kern[-0.5]{ }#it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
+    textpp->DrawLatexNDC(0.55, 0.795, Form("%.f#kern[-0.5]{ }#leq#kern[-0.5]{ }#it{p}_{T,ch jet} < %.f GeV/#it{c}", binning[mainBin], binning[mainBin + 1]));
 
     gPad->RedrawAxis();
 
@@ -166,9 +191,9 @@ void Paper(bool saveFigs = false)
     // Define tagging TGraphs
     TGraph *bjet_taggingGraph_IPs[5];
 
-    TH2D *h2IPxyJetpTN2 = (TH2D *)gDirectory->Get("h2IPxyJetpTN3");
-    TH2D *h2IPxyJetpTN2_bjet = (TH2D *)gDirectory->Get("h2IPxyJetpTN3_bjet");
-    TH2D *h2IPxyJetpTN2_cjet = (TH2D *)gDirectory->Get("h2IPxyJetpTN3_cjet");
+    TH2D *h2IPxyJetpTN2 = (TH2D *)gDirectory->Get("h2IPzJetpTN3");
+    TH2D *h2IPxyJetpTN2_bjet = (TH2D *)gDirectory->Get("h2IPzJetpTN3_bjet");
+    TH2D *h2IPxyJetpTN2_cjet = (TH2D *)gDirectory->Get("h2IPzJetpTN3_cjet");
     TH2D *h2IPxyJetpTN2_ljet = (TH2D *)h2IPxyJetpTN2->Clone("h2IPxyJetpTN3_ljet");
     h2IPxyJetpTN2_ljet->Add(h2IPxyJetpTN2_bjet, -1);
     h2IPxyJetpTN2_ljet->Add(h2IPxyJetpTN2_cjet, -1);
@@ -216,11 +241,11 @@ void Paper(bool saveFigs = false)
     // Plot IPs distributions for different jet flavors
     TCanvas *cDCA = new TCanvas("cDCA", "DCA Distributions", 800, 800);
     cDCA->cd();
-    gPad->SetGridx();
-    gPad->SetGridy();
+    // gPad->SetGridx();
+    // gPad->SetGridy();
     gPad->SetTicks();
     gPad->SetLogy();
-    gPad->SetMargin(0.1, 0.01, 0.1, 0.01);
+    gPad->SetMargin(0.11, 0.01, 0.1, 0.01);
 
     int mainBinIPs = 4;
 
@@ -232,19 +257,16 @@ void Paper(bool saveFigs = false)
     hDCA_cjet->Scale(1.0 / hDCA_cjet->Integral());
     hDCA_ljet->Scale(1.0 / hDCA_ljet->Integral());
 
-    hDCA_bjet->Rebin(2);
-    hDCA_cjet->Rebin(2);
-    hDCA_ljet->Rebin(2);
+    // hDCA_bjet->Rebin(2);
+    // hDCA_cjet->Rebin(2);
+    // hDCA_ljet->Rebin(2);
 
     hDCA_bjet->SetLineColor(kRed);
     hDCA_bjet->SetMarkerColor(kRed);
-    // hDCA_bjet->SetMarkerStyle(21);
-    hDCA_cjet->SetLineColor(kGreen);
-    hDCA_cjet->SetMarkerColor(kGreen);
-    // hDCA_cjet->SetMarkerStyle(21);
+    hDCA_cjet->SetLineColor(kGreen + 2);
+    hDCA_cjet->SetMarkerColor(kGreen + 2);
     hDCA_ljet->SetLineColor(kBlue);
     hDCA_ljet->SetMarkerColor(kBlue);
-    // hDCA_ljet->SetMarkerStyle(21);
 
     hDCA_bjet->SetLineWidth(2);
     hDCA_cjet->SetLineWidth(2);
@@ -253,23 +275,36 @@ void Paper(bool saveFigs = false)
     hDCA_ljet->GetXaxis()->SetRangeUser(-1, 1);
     hDCA_ljet->GetXaxis()->SetTitle("signed DCA [cm]");
     hDCA_ljet->GetYaxis()->SetTitle("Probability Distribution");
+    hDCA_ljet->GetYaxis()->SetTitleSize(0.045);
+    hDCA_ljet->GetYaxis()->SetTitleOffset(1.2);
+    hDCA_ljet->GetXaxis()->SetTitleSize(0.045);
+    hDCA_ljet->GetXaxis()->SetTitleOffset(0.9);
+
     hDCA_ljet->Draw("");
     hDCA_bjet->Draw("SAME");
     hDCA_cjet->Draw("SAME");
 
-    TLegend *legIP = new TLegend(0.15, 0.15, 0.45, 0.35);
-    legIP->AddEntry(hDCA_bjet, "b-Jets");
-    legIP->AddEntry(hDCA_cjet, "c-Jets");
-    legIP->AddEntry(hDCA_ljet, "Light Flavor Jets");
+    TLegend *legIP = new TLegend(0.15, 0.46, 0.49, 0.66);
+    legIP->SetLineWidth(0);
+    legIP->AddEntry(hDCA_bjet, "beauty jets", "l");
+    legIP->AddEntry(hDCA_cjet, "charm jets", "l");
+    legIP->AddEntry(hDCA_ljet, "light-flavor jets", "l");
     legIP->Draw();
+
+    textpp->DrawLatexNDC(0.14, 0.93, "PYTHIA 8, pp,#kern[-0.5]{ }#sqrt{#it{s}} = 13 TeV");
+    textpp->DrawLatexNDC(0.14, 0.885, "Charged-particle jets");
+    textpp->DrawLatexNDC(0.14, 0.84, "Anti-#it{k}_{T},#kern[-0.5]{ }#it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
+    textpp->DrawLatexNDC(0.14, 0.795, Form("%.f#kern[-0.5]{ }#leq#kern[-0.5]{ }#it{p}_{T,ch jet} < %.f GeV/#it{c}", binning[mainBin], binning[mainBin + 1]));
+
+    gPad->RedrawAxis();
 
     if (saveFigs)
     {
         cDCA->SaveAs("PaperFigures/DCA_Distributions.pdf");
     }
 
-    // std::array<float, 15> workingPointsSV = {0.0, 0.05, 0.1, 0.15, 0.2, 0.4, 0.8, 1.0, 1.2, 1.4, 1.8, 2, 2.5, 3, 3.5};
-    std::array<float, 15> workingPointsSV = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.8};
+    std::array<float, 16> workingPointsSV = {0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.8};
+    // std::array<float, 15> workingPointsSV = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.8};
     double maxDispersion = 0.03;
 
     // Define tagging TGraphs
@@ -325,9 +360,9 @@ void Paper(bool saveFigs = false)
     TCanvas *cDL = new TCanvas("cDL", "Decay Length Distributions", 800, 800);
 
     cDL->cd();
-    gPad->SetMargin(0.1, 0.01, 0.1, 0.01);
-    gPad->SetGridx();
-    gPad->SetGridy();
+    gPad->SetMargin(0.11, 0.02, 0.1, 0.01);
+    // gPad->SetGridx();
+    // gPad->SetGridy();
     gPad->SetLogy();
     gPad->SetTicks();
 
@@ -345,8 +380,11 @@ void Paper(bool saveFigs = false)
     hDecayLength_cjet->Rebin(2);
     hDecayLength_ljet->Rebin(2);
 
+    hDecayLength_bjet->SetMarkerColor(kRed);
     hDecayLength_bjet->SetLineColor(kRed);
-    hDecayLength_cjet->SetLineColor(kGreen);
+    hDecayLength_cjet->SetMarkerColor(kGreen + 2);
+    hDecayLength_cjet->SetLineColor(kGreen + 2);
+    hDecayLength_ljet->SetMarkerColor(kBlue);
     hDecayLength_ljet->SetLineColor(kBlue);
 
     hDecayLength_bjet->SetLineWidth(2);
@@ -356,20 +394,103 @@ void Paper(bool saveFigs = false)
     hDecayLength_ljet->GetXaxis()->SetRangeUser(0, 20);
     hDecayLength_ljet->GetXaxis()->SetTitle("Decay Length [cm]");
     hDecayLength_ljet->GetYaxis()->SetTitle("Probability Distribution");
+    hDecayLength_ljet->GetYaxis()->SetTitleSize(0.045);
+    hDecayLength_ljet->GetYaxis()->SetTitleOffset(1.2);
+    hDecayLength_ljet->GetXaxis()->SetTitleSize(0.045);
+    hDecayLength_ljet->GetXaxis()->SetTitleOffset(0.9);
 
     hDecayLength_ljet->Draw();
     hDecayLength_bjet->Draw("same");
     hDecayLength_cjet->Draw("SAME");
 
-    TLegend *legDL = new TLegend(0.55, 0.65, 0.85, 0.85);
-    legDL->AddEntry(hDecayLength_bjet, "b-Jets");
-    legDL->AddEntry(hDecayLength_cjet, "c-Jets");
-    legDL->AddEntry(hDecayLength_ljet, "lf-Jets");
+    TLegend *legDL = new TLegend(0.57, 0.51, 0.91, 0.71);
+    legDL->SetLineWidth(0);
+    legDL->AddEntry(hDecayLength_bjet, "beauty jets", "l");
+    legDL->AddEntry(hDecayLength_cjet, "charm jets", "l");
+    legDL->AddEntry(hDecayLength_ljet, "light-flavor jets", "l");
     legDL->Draw();
+
+    textpp->DrawLatexNDC(0.55, 0.93, "PYTHIA 8, pp,#kern[-0.5]{ }#sqrt{#it{s}} = 13 TeV");
+    textpp->DrawLatexNDC(0.55, 0.885, "Charged-particle jets");
+    textpp->DrawLatexNDC(0.55, 0.84, "Anti-#it{k}_{T},#kern[-0.5]{ }#it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
+    textpp->DrawLatexNDC(0.55, 0.795, Form("%.f#kern[-0.5]{ }#leq#kern[-0.5]{ }#it{p}_{T,ch jet} < %.f GeV/#it{c}", binning[mainBinDL], binning[mainBinDL + 1]));
+
+    gPad->RedrawAxis();
 
     if (saveFigs)
     {
         cDL->SaveAs("PaperFigures/DecayLengthDistributions.pdf");
+    }
+
+    // Plot CPA distributions for different jet flavors
+    TH2D *hCPAvsJetpT = (TH2D *)gDirectory->Get("hCPAvsJetpT");
+    TH2D *hCPAvsJetpT_bjet = (TH2D *)gDirectory->Get("hCPAvsJetpT_bjet");
+    TH2D *hCPAvsJetpT_cjet = (TH2D *)gDirectory->Get("hCPAvsJetpT_cjet");
+    TH2D *hCPAvsJetpT_ljet = (TH2D *)hCPAvsJetpT->Clone("hCPAvsJetpT_ljet");
+    hCPAvsJetpT_ljet->Add(hCPAvsJetpT_bjet, -1);
+    hCPAvsJetpT_ljet->Add(hCPAvsJetpT_cjet, -1);
+
+    TCanvas *cCPA = new TCanvas("cCPA", "CPA Distributions", 800, 800);
+    cCPA->cd();
+    // gPad->SetGridx();
+    // gPad->SetGridy();
+    gPad->SetTicks();
+    gPad->SetLogy();
+    gPad->SetMargin(0.11, 0.01, 0.1, 0.01);
+
+    int mainBinCPA = 4;
+
+    TH1D *hCPA_bjet = hCPAvsJetpT_bjet->ProjectionY(Form("hCPA_bjet_ibin%d", (int)mainBinCPA), hCPAvsJetpT_bjet->GetXaxis()->FindBin(binning[mainBinCPA]), hCPAvsJetpT_bjet->GetXaxis()->FindBin(binning[mainBinCPA + 1]));
+    TH1D *hCPA_cjet = hCPAvsJetpT_cjet->ProjectionY(Form("hCPA_cjet_ibin%d", (int)mainBinCPA), hCPAvsJetpT_cjet->GetXaxis()->FindBin(binning[mainBinCPA]), hCPAvsJetpT_cjet->GetXaxis()->FindBin(binning[mainBinCPA + 1]));
+    TH1D *hCPA_ljet = hCPAvsJetpT_ljet->ProjectionY(Form("hCPA_ljet_ibin%d", (int)mainBinCPA), hCPAvsJetpT_ljet->GetXaxis()->FindBin(binning[mainBinCPA]), hCPAvsJetpT_ljet->GetXaxis()->FindBin(binning[mainBinCPA + 1]));
+
+    hCPA_bjet->Scale(1.0 / hCPA_bjet->Integral());
+    hCPA_cjet->Scale(1.0 / hCPA_cjet->Integral());
+    hCPA_ljet->Scale(1.0 / hCPA_ljet->Integral());
+
+    hCPA_bjet->Rebin(2);
+    hCPA_cjet->Rebin(2);
+    hCPA_ljet->Rebin(2);
+
+    hCPA_bjet->SetLineColor(kRed);
+    hCPA_bjet->SetMarkerColor(kRed);
+    hCPA_cjet->SetLineColor(kGreen + 2);
+    hCPA_cjet->SetMarkerColor(kGreen + 2);
+    hCPA_ljet->SetLineColor(kBlue);
+    hCPA_ljet->SetMarkerColor(kBlue);
+
+    hCPA_bjet->SetLineWidth(2);
+    hCPA_cjet->SetLineWidth(2);
+    hCPA_ljet->SetLineWidth(2);
+
+    hCPA_ljet->GetXaxis()->SetTitle("CPA");
+    hCPA_ljet->GetYaxis()->SetTitle("Probability Distribution");
+    hDecayLength_ljet->GetYaxis()->SetTitleSize(0.045);
+    hDecayLength_ljet->GetYaxis()->SetTitleOffset(1.2);
+    hDecayLength_ljet->GetXaxis()->SetTitleSize(0.045);
+    hDecayLength_ljet->GetXaxis()->SetTitleOffset(0.9);
+
+    hCPA_bjet->Draw("");
+    hCPA_ljet->Draw("SAME");
+    hCPA_cjet->Draw("SAME");
+
+    TLegend *legCPA = new TLegend(0.15, 0.51, 0.49, 0.71);
+    legCPA->SetLineWidth(0);
+    legCPA->AddEntry(hCPA_bjet, "beauty jets", "l");
+    legCPA->AddEntry(hCPA_cjet, "charm jets", "l");
+    legCPA->AddEntry(hCPA_ljet, "light-flavor jets", "l");
+    legCPA->Draw();
+
+    textpp->DrawLatexNDC(0.14, 0.93, "PYTHIA 8, pp,#kern[-0.5]{ }#sqrt{#it{s}} = 13 TeV");
+    textpp->DrawLatexNDC(0.14, 0.885, "Charged-particle jets");
+    textpp->DrawLatexNDC(0.14, 0.84, "Anti-#it{k}_{T},#kern[-0.5]{ }#it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
+    textpp->DrawLatexNDC(0.14, 0.795, Form("%.f#kern[-0.5]{ }#leq#kern[-0.5]{ }#it{p}_{T,ch jet} < %.f GeV/#it{c}", binning[mainBinCPA], binning[mainBinCPA + 1]));
+
+    gPad->RedrawAxis();
+
+    if (saveFigs)
+    {
+        cCPA->SaveAs("PaperFigures/CPA_Distributions.pdf");
     }
 
     TCanvas *cComp[binning.size() - 1];
@@ -382,29 +503,35 @@ void Paper(bool saveFigs = false)
     {
         cComp[ibin] = new TCanvas(Form("cComp%d", (int)ibin), Form("Purity vs Efficiency for IP %.f - %.f", binning[ibin], binning[ibin + 1]), 800, 800);
         cComp[ibin]->cd();
-        gPad->SetGridx();
-        gPad->SetGridy();
+        // gPad->SetGridx();
+        // gPad->SetGridy();
         gPad->SetTicks();
         gPad->SetMargin(0.1, 0.01, 0.1, 0.01);
-        TH2D *hTemp = new TH2D(Form("htemp%d", (int)ibin), Form("htemp;Efficiency;Purity"), 1, 0, 1, 1, 0, 1);
 
-        hTemp->Draw();
-        TLegend *leg1 = new TLegend(0.14, 0.14, 0.44, 0.42);
+        hTemp1->Draw();
+        TLegend *leg1 = new TLegend(0.7, 0.75, 0.91, 0.96);
+        leg1->SetTextSizePixels(26);
         leg1->SetLineWidth(0);
-        // leg->SetFillStyle(0);
-        bjet_taggingGraph[ibin]->SetLineColor(kBlack);
-        bjet_taggingGraph_IPs[ibin]->SetLineColor(kRed + 1);
-        bjet_taggingGraph_SV[ibin]->SetLineColor(kGreen + 1);
+
+        bjet_taggingGraph[ibin]->SetLineColor(kBlue);
+        bjet_taggingGraph_IPs[ibin]->SetLineColor(kRed);
+        bjet_taggingGraph_SV[ibin]->SetLineColor(kGreen + 2);
+
         bjet_taggingGraph[ibin]->Draw("same");
         bjet_taggingGraph_IPs[ibin]->Draw("same");
         bjet_taggingGraph_SV[ibin]->Draw("same");
-        leg1->AddEntry(bjet_taggingGraph[ibin], "ML", "l");
-        leg1->AddEntry(bjet_taggingGraph_IPs[ibin], "IP", "l");
-        leg1->AddEntry(bjet_taggingGraph_SV[ibin], "SV", "l");
-        leg1->Draw();
-        gPad->RedrawAxis();
 
-        latex->DrawLatexNDC(0.15, 0.45, Form("#it{p}_{T, jet}: %.f - %.f GeV/#it{c}", binning[ibin], binning[ibin + 1]));
+        leg1->AddEntry(bjet_taggingGraph[ibin], "ML model", "l");
+        leg1->AddEntry(bjet_taggingGraph_IPs[ibin], "IP method", "l");
+        leg1->AddEntry(bjet_taggingGraph_SV[ibin], "SV method", "l");
+        leg1->Draw();
+
+        textpp->DrawLatexNDC(0.14, 0.93, "PYTHIA 8, pp,#kern[-0.5]{ }#sqrt{#it{s}} = 13 TeV");
+        textpp->DrawLatexNDC(0.14, 0.885, "Charged-particle jets");
+        textpp->DrawLatexNDC(0.14, 0.84, "Anti-#it{k}_{T},#kern[-0.5]{ }#it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
+        textpp->DrawLatexNDC(0.14, 0.795, Form("%.f#kern[-0.5]{ }#leq#kern[-0.5]{ }#it{p}_{T,ch jet} < %.f GeV/#it{c}", binning[ibin], binning[ibin + 1]));
+
+        gPad->RedrawAxis();
 
         if (saveFigs)
         {

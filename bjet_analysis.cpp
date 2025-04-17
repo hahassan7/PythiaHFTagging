@@ -28,7 +28,7 @@ public:
     {
     }
 
-    void analyze(int nEvents = 10000, double pTHatmin = 20, double pTHatmax = -1, bool writeTHnSpase = false)
+    void analyze(int nEvents = 10000, double pTHatmin = 20, double pTHatmax = -1, bool writeTHnSpase = false, bool doNormalization = false)
     {
         auto logLocal = [this](DebugLevel level, const std::string &message)
         {
@@ -105,26 +105,26 @@ public:
         TH1F *hPrimaryVertexZ = new TH1F("hPrimaryVertexZ", "Primary Vertex Z Position;z (cm);Counts", 100, -10, 10);
         TH1F *hPrimaryVertexZDiff = new TH1F("hPrimaryVertexZDiff", "Primary Vertex Z Position;z (cm);Counts", 1000, -5, 5);
 
-        TH2D *hIPxyJetpTN2;
-        TH2D *hIPxyJetpTN3;
-        TH2D *hIPzJetpTN3;
-        TH2D *hIPJetpTN3;
+        TH2D *hIPJetpTN2_ljet;
+        TH2D *hIPxyJetpTN3_ljet;
+        TH2D *hIPzJetpTN3_ljet;
+        TH2D *hIPJetpTN3_ljet;
 
-        TH2D *hIPxyJetpTN2_bjet;
+        TH2D *hIPJetpTN2_bjet;
         TH2D *hIPxyJetpTN3_bjet;
         TH2D *hIPzJetpTN3_bjet;
         TH2D *hIPJetpTN3_bjet;
 
-        TH2D *hIPxyJetpTN2_cjet;
+        TH2D *hIPJetpTN2_cjet;
         TH2D *hIPxyJetpTN3_cjet;
         TH2D *hIPzJetpTN3_cjet;
         TH2D *hIPJetpTN3_cjet;
 
-        TH3D *hDecayLengthDispersionJetpT;
+        TH3D *hDecayLengthDispersionJetpT_ljet;
         TH3D *hDecayLengthDispersionJetpT_bjet;
         TH3D *hDecayLengthDispersionJetpT_cjet;
 
-        TH2D *hCPAvsJetpT;
+        TH2D *hCPAvsJetpT_ljet;
         TH2D *hCPAvsJetpT_bjet;
         TH2D *hCPAvsJetpT_cjet;
 
@@ -163,26 +163,26 @@ public:
             hScoreVsJetPt_lf = new TH2F("h2_score_jetpT_lfjet", "Score vs Jet pT (light-flavor jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
             hLogScoreVsJetPt_lf = new TH2F("h2_logscore_jetpT_lfjet", "-log(1-Score) vs Jet pT (light-flavor jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
 
-            hIPxyJetpTN2 = new TH2D("h2IPxyJetpTN2", "IP_{xy} vs. Jet pT (inclusive)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPxyJetpTN3 = new TH2D("h2IPxyJetpTN3", "IP_{xy} vs. Jet pT (inclusive)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPzJetpTN3 = new TH2D("h2IPzJetpTN3", "IP_{z} vs. Jet pT (inclusive)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPJetpTN3 = new TH2D("h2IPJetpTN3", "IP vs. Jet pT (inclusive)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPJetpTN2_ljet = new TH2D("h2IPJetpTN2_lfjet", "IP vs. Jet pT (light-flavor jets)N2;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPxyJetpTN3_ljet = new TH2D("h2IPxyJetpTN3_lfjet", "IP_{xy} vs. Jet pT (light-flavor jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPzJetpTN3_ljet = new TH2D("h2IPzJetpTN3_lfjet", "IP_{z} vs. Jet pT (light-flavor jets)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPJetpTN3_ljet = new TH2D("h2IPJetpTN3_lfjet", "IP vs. Jet pT (light-flavor jets)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 600, -1.2, 1.2);
 
-            hIPxyJetpTN2_bjet = new TH2D("h2IPxyJetpTN2_bjet", "IP_{xy} vs. Jet pT (b-jets)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPxyJetpTN3_bjet = new TH2D("h2IPxyJetpTN3_bjet", "IP_{xy} vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPzJetpTN3_bjet = new TH2D("h2IPzJetpTN3_bjet", "IP_{z} vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPJetpTN3_bjet = new TH2D("h2IPJetpTN3_bjet", "IP vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPJetpTN2_bjet = new TH2D("h2IPJetpTN2_bjet", "IP vs. Jet pT (b-jets)N2;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPxyJetpTN3_bjet = new TH2D("h2IPxyJetpTN3_bjet", "IP_{xy} vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPzJetpTN3_bjet = new TH2D("h2IPzJetpTN3_bjet", "IP_{z} vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPJetpTN3_bjet = new TH2D("h2IPJetpTN3_bjet", "IP vs. Jet pT (b-jets)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 600, -1.2, 1.2);
 
-            hIPxyJetpTN2_cjet = new TH2D("h2IPxyJetpTN2_cjet", "IP_{xy} vs. Jet pT (c-jets)N2;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPxyJetpTN3_cjet = new TH2D("h2IPxyJetpTN3_cjet", "IP_{xy} vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPzJetpTN3_cjet = new TH2D("h2IPzJetpTN3_cjet", "IP_{z} vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 350, -1.2, 1.2);
-            hIPJetpTN3_cjet = new TH2D("h2IPJetpTN3_cjet", "IP vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 350, -1.2, 1.2);
+            hIPJetpTN2_cjet = new TH2D("h2IPJetpTN2_cjet", "IP vs. Jet pT (c-jets)N2;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPxyJetpTN3_cjet = new TH2D("h2IPxyJetpTN3_cjet", "IP_{xy} vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPzJetpTN3_cjet = new TH2D("h2IPzJetpTN3_cjet", "IP_{z} vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP_{z} (cm)", 200, 0, 200, 600, -1.2, 1.2);
+            hIPJetpTN3_cjet = new TH2D("h2IPJetpTN3_cjet", "IP vs. Jet pT (c-jets)N3;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 600, -1.2, 1.2);
 
-            hDecayLengthDispersionJetpT = new TH3D("h3DecayLengthDispersionJetpT", "Decay Length vs. Dispersion vs. Jet pT (inclusive);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 600, 0, 30, 200, 0, 2);
+            hDecayLengthDispersionJetpT_ljet = new TH3D("h3DecayLengthDispersionJetpT_lfjet", "Decay Length vs. Dispersion vs. Jet pT (light-flavor jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 600, 0, 30, 200, 0, 2);
             hDecayLengthDispersionJetpT_bjet = new TH3D("h3DecayLengthDispersionJetpT_bjet", "Decay Length vs. Dispersion vs. Jet pT (b-jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 600, 0, 30, 200, 0, 2);
             hDecayLengthDispersionJetpT_cjet = new TH3D("h3DecayLengthDispersionJetpT_cjet", "Decay Length vs. Dispersion vs. Jet pT (c-jets);Jet pT (GeV/c);Decay Length (cm);Dispersion", 200, 0, 200, 600, 0, 30, 200, 0, 2);
 
-            hCPAvsJetpT = new TH2D("hCPAvsJetpT", "CPA vs. Jet pT (inclusive);Jet pT (GeV/c);CPA", 200, 0, 200, 210, -1.05, 1.05);
+            hCPAvsJetpT_ljet = new TH2D("hCPAvsJetpT_lfjet", "CPA vs. Jet pT (light-flavor jets);Jet pT (GeV/c);CPA", 200, 0, 200, 210, -1.05, 1.05);
             hCPAvsJetpT_bjet = new TH2D("hCPAvsJetpT_bjet", "CPA vs. Jet pT (b-jets);Jet pT (GeV/c);CPA", 200, 0, 200, 210, -1.05, 1.05);
             hCPAvsJetpT_cjet = new TH2D("hCPAvsJetpT_cjet", "CPA vs. Jet pT (c-jets);Jet pT (GeV/c);CPA", 200, 0, 200, 210, -1.05, 1.05);
         }
@@ -604,32 +604,18 @@ public:
                             hScoreVsJetPt_incl->Fill(jet.pt(), score);
                             hLogScoreVsJetPt_incl->Fill(jet.pt(), logScore);
 
-                            if (trackparams[1].trackpT > 0)
-                            {
-                                hIPxyJetpTN2->Fill(jet.pt(), std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D));
-                            }
-                            if (trackparams[2].trackpT > 0)
-                            {
-                                hIPJetpTN3->Fill(jet.pt(), std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D));
-                                hIPzJetpTN3->Fill(jet.pt(), trackparams[2].signedIP3D);
-                                hIPxyJetpTN3->Fill(jet.pt(), trackparams[2].signedIP2D);
-                            }
-                            if (svparams[0].svPt > 0)
-                            {
-                                hDecayLengthDispersionJetpT->Fill(jet.pt(), svparams[0].svDecayLength3D, svparams[0].svDispersion);
-                                hCPAvsJetpT->Fill(jet.pt(), svparams[0].svCPA);
-                            }
-
                             if (jetFlavor == JetTaggingSpecies::beauty)
                             {
+                                hScoreVsJetPt_b->Fill(jet.pt(), score);
+                                hLogScoreVsJetPt_b->Fill(jet.pt(), logScore);
 
                                 if (trackparams[1].trackpT > 0)
                                 {
-                                    hIPxyJetpTN2_bjet->Fill(jet.pt(), std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D));
+                                    hIPJetpTN2_bjet->Fill(jet.pt(), std::copysign(std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D), trackparams[1].signedIP2D));
                                 }
                                 if (trackparams[2].trackpT > 0)
                                 {
-                                    hIPJetpTN3_bjet->Fill(jet.pt(), std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D));
+                                    hIPJetpTN3_bjet->Fill(jet.pt(), std::copysign(std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D),trackparams[2].signedIP2D));
                                     hIPzJetpTN3_bjet->Fill(jet.pt(), trackparams[2].signedIP3D);
                                     hIPxyJetpTN3_bjet->Fill(jet.pt(), trackparams[2].signedIP2D);
                                 }
@@ -641,13 +627,16 @@ public:
                             }
                             else if (jetFlavor == JetTaggingSpecies::charm)
                             {
+                                hScoreVsJetPt_c->Fill(jet.pt(), score);
+                                hLogScoreVsJetPt_c->Fill(jet.pt(), logScore);
+
                                 if (trackparams[1].trackpT > 0)
                                 {
-                                    hIPxyJetpTN2_cjet->Fill(jet.pt(), std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D));
+                                    hIPJetpTN2_cjet->Fill(jet.pt(), std::copysign(std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D), trackparams[1].signedIP2D));
                                 }
                                 if (trackparams[2].trackpT > 0)
                                 {
-                                    hIPJetpTN3_cjet->Fill(jet.pt(), std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D));
+                                    hIPJetpTN3_cjet->Fill(jet.pt(), std::copysign(std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D), trackparams[2].signedIP2D));
                                     hIPzJetpTN3_cjet->Fill(jet.pt(), trackparams[2].signedIP3D);
                                     hIPxyJetpTN3_cjet->Fill(jet.pt(), trackparams[2].signedIP2D);
                                 }
@@ -657,21 +646,26 @@ public:
                                     hCPAvsJetpT_cjet->Fill(jet.pt(), svparams[0].svCPA);
                                 }
                             }
-
-                            if (jetFlavor == JetTaggingSpecies::beauty)
-                            {
-                                hScoreVsJetPt_b->Fill(jet.pt(), score);
-                                hLogScoreVsJetPt_b->Fill(jet.pt(), logScore);
-                            }
-                            else if (jetFlavor == JetTaggingSpecies::charm)
-                            {
-                                hScoreVsJetPt_c->Fill(jet.pt(), score);
-                                hLogScoreVsJetPt_c->Fill(jet.pt(), logScore);
-                            }
                             else
                             {
                                 hScoreVsJetPt_lf->Fill(jet.pt(), score);
                                 hLogScoreVsJetPt_lf->Fill(jet.pt(), logScore);
+
+                                if (trackparams[1].trackpT > 0)
+                                {
+                                    hIPJetpTN2_ljet->Fill(jet.pt(), std::copysign(std::sqrt(trackparams[1].signedIP3D * trackparams[1].signedIP3D + trackparams[1].signedIP2D * trackparams[1].signedIP2D), trackparams[1].signedIP2D));
+                                }
+                                if (trackparams[2].trackpT > 0)
+                                {
+                                    hIPJetpTN3_ljet->Fill(jet.pt(), std::copysign(std::sqrt(trackparams[2].signedIP3D * trackparams[2].signedIP3D + trackparams[2].signedIP2D * trackparams[2].signedIP2D), trackparams[2].signedIP2D));
+                                    hIPzJetpTN3_ljet->Fill(jet.pt(), trackparams[2].signedIP3D);
+                                    hIPxyJetpTN3_ljet->Fill(jet.pt(), trackparams[2].signedIP2D);
+                                }
+                                if (svparams[0].svPt > 0)
+                                {
+                                    hDecayLengthDispersionJetpT_ljet->Fill(jet.pt(), svparams[0].svDecayLength3D, svparams[0].svDispersion);
+                                    hCPAvsJetpT_ljet->Fill(jet.pt(), svparams[0].svCPA);
+                                }
                             }
                         }
                         else
@@ -759,7 +753,7 @@ public:
         logLocal(DebugLevel::INFO, "\nWriting histograms...");
         if (outFile && outFile->IsOpen())
         {
-            if (pTHatmax > 0 || pTHatmin > 20)
+            if ((pTHatmax > 0 || pTHatmin > 20) && doNormalization)
             {
                 hJetPt->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                 hJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
@@ -781,7 +775,8 @@ public:
                 hNConstituents_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                 if (mTreeGen->getDoPrediction())
                 {
-                    if (writeTHnSpase) {
+                    if (writeTHnSpase)
+                    {
                         hJetTaggingInfo->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     }
                     hScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
@@ -792,22 +787,22 @@ public:
                     hLogScoreVsJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hLogScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hIPxyJetpTN2->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hIPxyJetpTN2_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hIPxyJetpTN2_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hIPxyJetpTN3->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPJetpTN2_ljet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPJetpTN2_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPJetpTN2_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPxyJetpTN3_ljet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hIPxyJetpTN3_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hIPxyJetpTN3_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hIPzJetpTN3->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPzJetpTN3_ljet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hIPzJetpTN3_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hIPzJetpTN3_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hIPJetpTN3->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hIPJetpTN3_ljet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hIPJetpTN3_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hIPJetpTN3_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hDecayLengthDispersionJetpT->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hDecayLengthDispersionJetpT_ljet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hDecayLengthDispersionJetpT_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hDecayLengthDispersionJetpT_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hCPAvsJetpT->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    hCPAvsJetpT_ljet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hCPAvsJetpT_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hCPAvsJetpT_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                 }

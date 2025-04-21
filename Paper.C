@@ -15,7 +15,7 @@ void Paper(bool saveFigs = false)
     gStyle->SetOptStat(0);
     gStyle->SetOptTitle(0);
 
-    TFile *inputFile = TFile::Open("OutputFiles/Results_pTHat_ML_New.root");
+    TFile *inputFile = TFile::Open("OutputFiles/Results_pTHat_ML_NoNorm.root");
     if (!inputFile || inputFile->IsZombie())
     {
         std::cerr << "Error opening file!" << std::endl;
@@ -118,6 +118,8 @@ void Paper(bool saveFigs = false)
         c1->SaveAs("PaperFigures/PurityVsEfficiency.pdf");
     }
 
+// ###################################################################################################### Score Distributions
+
     // Plot score distributions for different jet flavors
     TCanvas *c2 = new TCanvas("c2", "Score Distributions", 800, 800);
     c2->cd();
@@ -186,29 +188,31 @@ void Paper(bool saveFigs = false)
         c2->SaveAs("PaperFigures/ScoreDistributions.pdf");
     }
 
-    std::array<float, 15> workingPointsIP = {0.0, 0.001, 0.002, 0.004, 0.008, 0.01, 0.02, 0.04, 0.08, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35};
+// ###################################################################################################### IPs Distributions
+
+    std::array<float, 18> workingPointsIP = {0.0, 0.001, 0.002, 0.004, 0.008, 0.01, 0.02, 0.04, 0.08, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.5, 0.8, 0.9};
 
     // Define tagging TGraphs
     TGraph *bjet_taggingGraph_IPs[5];
 
-    TH2D *h2IPxyJetpTN2 = (TH2D *)gDirectory->Get("h2IPzJetpTN3");
-    TH2D *h2IPxyJetpTN2_bjet = (TH2D *)gDirectory->Get("h2IPzJetpTN3_bjet");
-    TH2D *h2IPxyJetpTN2_cjet = (TH2D *)gDirectory->Get("h2IPzJetpTN3_cjet");
-    TH2D *h2IPxyJetpTN2_ljet = (TH2D *)h2IPxyJetpTN2->Clone("h2IPxyJetpTN3_ljet");
-    h2IPxyJetpTN2_ljet->Add(h2IPxyJetpTN2_bjet, -1);
-    h2IPxyJetpTN2_ljet->Add(h2IPxyJetpTN2_cjet, -1);
+    TH2D *h2IPJetpTN2_bjet = (TH2D *)gDirectory->Get("h2IPJetpTN3_bjet");
+    TH2D *h2IPJetpTN2_cjet = (TH2D *)gDirectory->Get("h2IPJetpTN3_cjet");
+    TH2D *h2IPJetpTN2_ljet = (TH2D *)gDirectory->Get("h2IPJetpTN3_lfjet");
+    TH2D *h2IPJetpTN2 = (TH2D *)h2IPJetpTN2_ljet->Clone("h2IPzJetpTN3");
+    h2IPJetpTN2->Add(h2IPJetpTN2_bjet);
+    h2IPJetpTN2->Add(h2IPJetpTN2_cjet);
 
     // TH1D *bjets_Total_IPs = (TH1D *)gDirectory->Get("hJetPt_b");
-    TH1D *bjets_Total_IPs = (TH1D *)h2IPxyJetpTN2_bjet->ProjectionX("bjets_Total_IPs");
+    TH1D *bjets_Total_IPs = (TH1D *)h2IPJetpTN2_bjet->ProjectionX("bjets_Total_IPs");
     bjets_Total_IPs = (TH1D *)bjets_Total_IPs->Rebin(binning.size() - 1, "total_bjets_rebinned", binning.data());
 
     for (size_t iwork = 0; iwork < workingPointsIP.size(); iwork++)
     {
         // Tagged jetsiwork
-        TH1D *tagged_incjets = (TH1D *)h2IPxyJetpTN2->ProjectionX(Form("tagged_incjets_iwork%d", (int)iwork), h2IPxyJetpTN2->GetYaxis()->FindBin(workingPointsIP[iwork]), h2IPxyJetpTN2_bjet->GetYaxis()->GetNbins(), "e");
+        TH1D *tagged_incjets = (TH1D *)h2IPJetpTN2->ProjectionX(Form("tagged_incjets_iwork%d", (int)iwork), h2IPJetpTN2->GetYaxis()->FindBin(workingPointsIP[iwork]), h2IPJetpTN2_bjet->GetYaxis()->GetNbins(), "e");
         tagged_incjets = (TH1D *)tagged_incjets->Rebin(binning.size() - 1, Form("tagged_incjets_rebinned_iwork%d", (int)iwork), binning.data());
 
-        TH1D *tagged_bjets = (TH1D *)h2IPxyJetpTN2_bjet->ProjectionX(Form("tagged_bjets_iwork%d", (int)iwork), h2IPxyJetpTN2_bjet->GetYaxis()->FindBin(workingPointsIP[iwork]), h2IPxyJetpTN2_bjet->GetYaxis()->GetNbins(), "e");
+        TH1D *tagged_bjets = (TH1D *)h2IPJetpTN2_bjet->ProjectionX(Form("tagged_bjets_iwork%d", (int)iwork), h2IPJetpTN2_bjet->GetYaxis()->FindBin(workingPointsIP[iwork]), h2IPJetpTN2_bjet->GetYaxis()->GetNbins(), "e");
         tagged_bjets = (TH1D *)tagged_bjets->Rebin(binning.size() - 1, Form("tagged_bjets_rebinned_iwork%d", (int)iwork), binning.data());
 
         // Tagging efficiency
@@ -249,9 +253,9 @@ void Paper(bool saveFigs = false)
 
     int mainBinIPs = 4;
 
-    TH1D *hDCA_bjet = h2IPxyJetpTN2_bjet->ProjectionY(Form("hDCA_bjet_ibin%d", (int)mainBinIPs), h2IPxyJetpTN2_bjet->GetXaxis()->FindBin(binning[mainBinIPs]), h2IPxyJetpTN2_bjet->GetXaxis()->FindBin(binning[mainBinIPs + 1]));
-    TH1D *hDCA_cjet = h2IPxyJetpTN2_cjet->ProjectionY(Form("hDCA_cjet_ibin%d", (int)mainBinIPs), h2IPxyJetpTN2_cjet->GetXaxis()->FindBin(binning[mainBinIPs]), h2IPxyJetpTN2_cjet->GetXaxis()->FindBin(binning[mainBinIPs + 1]));
-    TH1D *hDCA_ljet = h2IPxyJetpTN2_ljet->ProjectionY(Form("hDCA_ljet_ibin%d", (int)mainBinIPs), h2IPxyJetpTN2_ljet->GetXaxis()->FindBin(binning[mainBinIPs]), h2IPxyJetpTN2_ljet->GetXaxis()->FindBin(binning[mainBinIPs + 1]));
+    TH1D *hDCA_bjet = h2IPJetpTN2_bjet->ProjectionY(Form("hDCA_bjet_ibin%d", (int)mainBinIPs), h2IPJetpTN2_bjet->GetXaxis()->FindBin(binning[mainBinIPs]), h2IPJetpTN2_bjet->GetXaxis()->FindBin(binning[mainBinIPs + 1]));
+    TH1D *hDCA_cjet = h2IPJetpTN2_cjet->ProjectionY(Form("hDCA_cjet_ibin%d", (int)mainBinIPs), h2IPJetpTN2_cjet->GetXaxis()->FindBin(binning[mainBinIPs]), h2IPJetpTN2_cjet->GetXaxis()->FindBin(binning[mainBinIPs + 1]));
+    TH1D *hDCA_ljet = h2IPJetpTN2_ljet->ProjectionY(Form("hDCA_ljet_ibin%d", (int)mainBinIPs), h2IPJetpTN2_ljet->GetXaxis()->FindBin(binning[mainBinIPs]), h2IPJetpTN2_ljet->GetXaxis()->FindBin(binning[mainBinIPs + 1]));
 
     hDCA_bjet->Scale(1.0 / hDCA_bjet->Integral());
     hDCA_cjet->Scale(1.0 / hDCA_cjet->Integral());
@@ -303,6 +307,150 @@ void Paper(bool saveFigs = false)
         cDCA->SaveAs("PaperFigures/DCA_Distributions.pdf");
     }
 
+// ###################################################################################################### DCAxy Distributions
+
+    // Plot DCAxy distributions for different jet flavors
+    TH2D *h2IPxyJetpTN3_bjet = (TH2D *)gDirectory->Get("h2IPxyJetpTN3_bjet");
+    TH2D *h2IPxyJetpTN3_cjet = (TH2D *)gDirectory->Get("h2IPxyJetpTN3_cjet");
+    TH2D *h2IPxyJetpTN3_ljet = (TH2D *)gDirectory->Get("h2IPxyJetpTN3_lfjet");
+
+    TCanvas *cDCAxy = new TCanvas("cDCAxy", "DCAxy Distributions", 800, 800);
+    cDCAxy->cd();
+    // gPad->SetGridx();
+    // gPad->SetGridy();
+    gPad->SetTicks();
+    gPad->SetLogy();
+    gPad->SetMargin(0.11, 0.01, 0.1, 0.01);
+
+    int mainBinDCAxy = 4;
+
+    TH1D *hDCAxy_bjet = h2IPxyJetpTN3_bjet->ProjectionY(Form("hDCAxy_bjet_ibin%d", (int)mainBinDCAxy), h2IPxyJetpTN3_bjet->GetXaxis()->FindBin(binning[mainBinDCAxy]), h2IPxyJetpTN3_bjet->GetXaxis()->FindBin(binning[mainBinDCAxy + 1]));
+    TH1D *hDCAxy_cjet = h2IPxyJetpTN3_cjet->ProjectionY(Form("hDCAxy_cjet_ibin%d", (int)mainBinDCAxy), h2IPxyJetpTN3_cjet->GetXaxis()->FindBin(binning[mainBinDCAxy]), h2IPxyJetpTN3_cjet->GetXaxis()->FindBin(binning[mainBinDCAxy + 1]));
+    TH1D *hDCAxy_ljet = h2IPxyJetpTN3_ljet->ProjectionY(Form("hDCAxy_ljet_ibin%d", (int)mainBinDCAxy), h2IPxyJetpTN3_ljet->GetXaxis()->FindBin(binning[mainBinDCAxy]), h2IPxyJetpTN3_ljet->GetXaxis()->FindBin(binning[mainBinDCAxy + 1]));
+
+    hDCAxy_bjet->Scale(1.0 / hDCAxy_bjet->Integral());
+    hDCAxy_cjet->Scale(1.0 / hDCAxy_cjet->Integral());
+    hDCAxy_ljet->Scale(1.0 / hDCAxy_ljet->Integral());
+
+    hDCAxy_bjet->Rebin(2);
+    hDCAxy_cjet->Rebin(2);
+    hDCAxy_ljet->Rebin(2);
+
+    hDCAxy_bjet->SetLineColor(kRed);
+    hDCAxy_bjet->SetMarkerColor(kRed);
+    hDCAxy_cjet->SetLineColor(kGreen + 2);
+    hDCAxy_cjet->SetMarkerColor(kGreen + 2);
+    hDCAxy_ljet->SetLineColor(kBlue);
+    hDCAxy_ljet->SetMarkerColor(kBlue);
+
+    hDCAxy_bjet->SetLineWidth(2);
+    hDCAxy_cjet->SetLineWidth(2);
+    hDCAxy_ljet->SetLineWidth(2);
+
+    hDCAxy_ljet->GetXaxis()->SetTitle("DCA_{xy} [cm]");
+    hDCAxy_ljet->GetYaxis()->SetTitle("Probability Distribution");
+    // hDCAxy_ljet->GetYaxis()->SetRangeUser(1e-4, 2);
+    hDCAxy_ljet->GetYaxis()->SetTitleSize(0.045);
+    hDCAxy_ljet->GetYaxis()->SetTitleOffset(1.2);
+    hDCAxy_ljet->GetXaxis()->SetTitleSize(0.045);
+    hDCAxy_ljet->GetXaxis()->SetTitleOffset(0.9);
+
+    hDCAxy_ljet->Draw("");
+    hDCAxy_bjet->Draw("SAME");
+    hDCAxy_cjet->Draw("SAME");
+
+    TLegend *legDCAxy = new TLegend(0.15, 0.57, 0.49, 0.77);
+    legDCAxy->SetLineWidth(0);
+    legDCAxy->AddEntry(hDCAxy_bjet, "beauty jets", "l");
+    legDCAxy->AddEntry(hDCAxy_cjet, "charm jets", "l");
+    legDCAxy->AddEntry(hDCAxy_ljet, "light-flavor jets", "l");
+    legDCAxy->Draw();
+
+    textpp->DrawLatexNDC(0.14, 0.93, "PYTHIA 8, pp,#kern[-0.5]{ }#sqrt{#it{s}} = 13 TeV");
+    textpp->DrawLatexNDC(0.14, 0.885, "Charged-particle jets");
+    textpp->DrawLatexNDC(0.14, 0.84, "Anti-#it{k}_{T},#kern[-0.5]{ }#it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
+    textpp->DrawLatexNDC(0.14, 0.795, Form("%.f#kern[-0.5]{ }#leq#kern[-0.5]{ }#it{p}_{T,ch jet} < %.f GeV/#it{c}", binning[mainBinDCAxy], binning[mainBinDCAxy + 1]));
+
+    gPad->RedrawAxis();
+
+    if (saveFigs)
+    {
+        cDCAxy->SaveAs("PaperFigures/DCAxy_Distributions.pdf");
+    }
+
+// ###################################################################################################### DCAz Distributions
+
+    TH2D *h2IPzJetpTN3_bjet = (TH2D *)gDirectory->Get("h2IPzJetpTN3_bjet");
+    TH2D *h2IPzJetpTN3_cjet = (TH2D *)gDirectory->Get("h2IPzJetpTN3_cjet");
+    TH2D *h2IPzJetpTN3_ljet = (TH2D *)gDirectory->Get("h2IPzJetpTN3_lfjet");
+
+    TCanvas *cDCAz = new TCanvas("cDCAz", "DCAz Distributions", 800, 800);
+    cDCAz->cd();
+    // gPad->SetGridx();
+    // gPad->SetGridy();
+    gPad->SetTicks();
+    gPad->SetLogy();
+    gPad->SetMargin(0.11, 0.01, 0.1, 0.01);
+
+    int mainBinDCAz = 4;
+
+    TH1D *hDCAz_bjet = h2IPzJetpTN3_bjet->ProjectionY(Form("hDCAz_bjet_ibin%d", (int)mainBinDCAz), h2IPzJetpTN3_bjet->GetXaxis()->FindBin(binning[mainBinDCAz]), h2IPzJetpTN3_bjet->GetXaxis()->FindBin(binning[mainBinDCAz + 1]));
+    TH1D *hDCAz_cjet = h2IPzJetpTN3_cjet->ProjectionY(Form("hDCAz_cjet_ibin%d", (int)mainBinDCAz), h2IPzJetpTN3_cjet->GetXaxis()->FindBin(binning[mainBinDCAz]), h2IPzJetpTN3_cjet->GetXaxis()->FindBin(binning[mainBinDCAz + 1]));
+    TH1D *hDCAz_ljet = h2IPzJetpTN3_ljet->ProjectionY(Form("hDCAz_ljet_ibin%d", (int)mainBinDCAz), h2IPzJetpTN3_ljet->GetXaxis()->FindBin(binning[mainBinDCAz]), h2IPzJetpTN3_ljet->GetXaxis()->FindBin(binning[mainBinDCAz + 1]));
+
+    hDCAz_bjet->Scale(1.0 / hDCAz_bjet->Integral());
+    hDCAz_cjet->Scale(1.0 / hDCAz_cjet->Integral());
+    hDCAz_ljet->Scale(1.0 / hDCAz_ljet->Integral());
+
+    hDCAz_bjet->Rebin(2);
+    hDCAz_cjet->Rebin(2);
+    hDCAz_ljet->Rebin(2);
+
+    hDCAz_bjet->SetLineColor(kRed);
+    hDCAz_bjet->SetMarkerColor(kRed);
+    hDCAz_cjet->SetLineColor(kGreen + 2);
+    hDCAz_cjet->SetMarkerColor(kGreen + 2);
+    hDCAz_ljet->SetLineColor(kBlue);
+    hDCAz_ljet->SetMarkerColor(kBlue);
+
+    hDCAz_bjet->SetLineWidth(2);
+    hDCAz_cjet->SetLineWidth(2);
+    hDCAz_ljet->SetLineWidth(2);
+
+    hDCAz_ljet->GetXaxis()->SetTitle("DCA_{z} [cm]");
+    hDCAz_ljet->GetYaxis()->SetTitle("Probability Distribution");
+    // hDCAz_ljet->GetYaxis()->SetRangeUser(1e-4, 2);
+    hDCAz_ljet->GetYaxis()->SetTitleSize(0.045);
+    hDCAz_ljet->GetYaxis()->SetTitleOffset(1.2);
+    hDCAz_ljet->GetXaxis()->SetTitleSize(0.045);
+    hDCAz_ljet->GetXaxis()->SetTitleOffset(0.9);
+
+    hDCAz_ljet->Draw("");
+    hDCAz_bjet->Draw("SAME");
+    hDCAz_cjet->Draw("SAME");
+
+    TLegend *legDCAz = new TLegend(0.15, 0.57, 0.49, 0.77);
+    legDCAz->SetLineWidth(0);
+    legDCAz->AddEntry(hDCAz_bjet, "beauty jets", "l");
+    legDCAz->AddEntry(hDCAz_cjet, "charm jets", "l");
+    legDCAz->AddEntry(hDCAz_ljet, "light-flavor jets", "l");
+    legDCAz->Draw();
+
+    textpp->DrawLatexNDC(0.14, 0.93, "PYTHIA 8, pp,#kern[-0.5]{ }#sqrt{#it{s}} = 13 TeV");
+    textpp->DrawLatexNDC(0.14, 0.885, "Charged-particle jets");
+    textpp->DrawLatexNDC(0.14, 0.84, "Anti-#it{k}_{T},#kern[-0.5]{ }#it{R} = 0.4, |#it{#eta}_{jet}| < 0.5");
+    textpp->DrawLatexNDC(0.14, 0.795, Form("%.f#kern[-0.5]{ }#leq#kern[-0.5]{ }#it{p}_{T,ch jet} < %.f GeV/#it{c}", binning[mainBinDCAz], binning[mainBinDCAz + 1]));
+
+    gPad->RedrawAxis();
+
+    if (saveFigs)
+    {
+        cDCAz->SaveAs("PaperFigures/DCAz_Distributions.pdf");
+    }
+
+// ###################################################################################################### SV Distributions
+
+    // Plot SV distributions for different jet flavors
     std::array<float, 16> workingPointsSV = {0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.8};
     // std::array<float, 15> workingPointsSV = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.8};
     double maxDispersion = 0.03;
@@ -310,12 +458,12 @@ void Paper(bool saveFigs = false)
     // Define tagging TGraphs
     TGraph *bjet_taggingGraph_SV[5];
 
-    TH3D *h3DecayLengthDispersionJetpT = (TH3D *)gDirectory->Get("h3DecayLengthDispersionJetpT");
     TH3D *h3DecayLengthDispersionJetpT_bjet = (TH3D *)gDirectory->Get("h3DecayLengthDispersionJetpT_bjet");
     TH3D *h3DecayLengthDispersionJetpT_cjet = (TH3D *)gDirectory->Get("h3DecayLengthDispersionJetpT_cjet");
-    TH3D *h3DecayLengthDispersionJetpT_lfjet = (TH3D *)h3DecayLengthDispersionJetpT->Clone("h3DecayLengthDispersionJetpT_lfjet");
-    h3DecayLengthDispersionJetpT_lfjet->Add(h3DecayLengthDispersionJetpT_bjet, -1);
-    h3DecayLengthDispersionJetpT_lfjet->Add(h3DecayLengthDispersionJetpT_cjet, -1);
+    TH3D *h3DecayLengthDispersionJetpT_lfjet = (TH3D *)gDirectory->Get("h3DecayLengthDispersionJetpT_lfjet");
+    TH3D *h3DecayLengthDispersionJetpT = (TH3D *)h3DecayLengthDispersionJetpT_lfjet->Clone("h3DecayLengthDispersionJetpT");
+    h3DecayLengthDispersionJetpT->Add(h3DecayLengthDispersionJetpT_bjet);
+    h3DecayLengthDispersionJetpT->Add(h3DecayLengthDispersionJetpT_cjet);
 
     // TH1D *bjets_Total_SV = (TH1D *)gDirectory->Get("hJetPt_b");
     TH1D *bjets_Total_SV = (TH1D *)h3DecayLengthDispersionJetpT_bjet->ProjectionX("bjets_Total_SV");
@@ -356,6 +504,8 @@ void Paper(bool saveFigs = false)
         bjet_taggingGraph_SV[ibin]->SetMarkerColor(mycolors[ibin]);
         bjet_taggingGraph_SV[ibin]->SetMarkerStyle(21);
     }
+
+// ####################################################################################################### Decay Length Distributions
 
     TCanvas *cDL = new TCanvas("cDL", "Decay Length Distributions", 800, 800);
 
@@ -422,13 +572,15 @@ void Paper(bool saveFigs = false)
         cDL->SaveAs("PaperFigures/DecayLengthDistributions.pdf");
     }
 
+// ###################################################################################################### CPA Distributions
+
     // Plot CPA distributions for different jet flavors
-    TH2D *hCPAvsJetpT = (TH2D *)gDirectory->Get("hCPAvsJetpT");
+    // TH2D *hCPAvsJetpT = (TH2D *)gDirectory->Get("hCPAvsJetpT");
     TH2D *hCPAvsJetpT_bjet = (TH2D *)gDirectory->Get("hCPAvsJetpT_bjet");
     TH2D *hCPAvsJetpT_cjet = (TH2D *)gDirectory->Get("hCPAvsJetpT_cjet");
-    TH2D *hCPAvsJetpT_ljet = (TH2D *)hCPAvsJetpT->Clone("hCPAvsJetpT_ljet");
-    hCPAvsJetpT_ljet->Add(hCPAvsJetpT_bjet, -1);
-    hCPAvsJetpT_ljet->Add(hCPAvsJetpT_cjet, -1);
+    TH2D *hCPAvsJetpT_ljet = (TH2D *)gDirectory->Get("hCPAvsJetpT_lfjet");
+    // hCPAvsJetpT_ljet->Add(hCPAvsJetpT_bjet, -1);
+    // hCPAvsJetpT_ljet->Add(hCPAvsJetpT_cjet, -1);
 
     TCanvas *cCPA = new TCanvas("cCPA", "CPA Distributions", 800, 800);
     cCPA->cd();
@@ -463,18 +615,19 @@ void Paper(bool saveFigs = false)
     hCPA_cjet->SetLineWidth(2);
     hCPA_ljet->SetLineWidth(2);
 
-    hCPA_ljet->GetXaxis()->SetTitle("CPA");
-    hCPA_ljet->GetYaxis()->SetTitle("Probability Distribution");
-    hDecayLength_ljet->GetYaxis()->SetTitleSize(0.045);
-    hDecayLength_ljet->GetYaxis()->SetTitleOffset(1.2);
-    hDecayLength_ljet->GetXaxis()->SetTitleSize(0.045);
-    hDecayLength_ljet->GetXaxis()->SetTitleOffset(0.9);
+    hCPA_bjet->GetXaxis()->SetTitle("CPA");
+    hCPA_bjet->GetYaxis()->SetTitle("Probability Distribution");
+    hCPA_bjet->GetYaxis()->SetRangeUser(1e-4, 2);
+    hCPA_bjet->GetYaxis()->SetTitleSize(0.045);
+    hCPA_bjet->GetYaxis()->SetTitleOffset(1.2);
+    hCPA_bjet->GetXaxis()->SetTitleSize(0.045);
+    hCPA_bjet->GetXaxis()->SetTitleOffset(0.9);
 
     hCPA_bjet->Draw("");
     hCPA_ljet->Draw("SAME");
     hCPA_cjet->Draw("SAME");
 
-    TLegend *legCPA = new TLegend(0.15, 0.51, 0.49, 0.71);
+    TLegend *legCPA = new TLegend(0.15, 0.57, 0.49, 0.77);
     legCPA->SetLineWidth(0);
     legCPA->AddEntry(hCPA_bjet, "beauty jets", "l");
     legCPA->AddEntry(hCPA_cjet, "charm jets", "l");
@@ -492,6 +645,8 @@ void Paper(bool saveFigs = false)
     {
         cCPA->SaveAs("PaperFigures/CPA_Distributions.pdf");
     }
+
+// ###################################################################################################### Purity vs Efficiency Comparison
 
     TCanvas *cComp[binning.size() - 1];
 

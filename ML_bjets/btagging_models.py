@@ -153,7 +153,7 @@ def EvaluateModelPerformance(model, data_in, name, minpT, maxpT):
     score_C  = myModel.fModel.predict(X_test_C, batch_size=512, verbose=0)
     score_LF = myModel.fModel.predict(X_test_LF, batch_size=512, verbose=0)
 
-  threshold = GetScoreThreshold(score_B, 0.6)
+  threshold = GetScoreThreshold(score_B, 0.90)
   print('\n##########################')
   print('\nThresold score is: {} \n'.format(threshold))
   print('b efficiency: {}'.format(GetThresholdEfficiency(score_B, threshold)))
@@ -199,23 +199,43 @@ def SaveHistogram(fname, title, y, functionlabels, rangex=(0,1), legendloc='uppe
   plot.clf()
 
 #########################################################
-def SaveConfusionMatrix(y_true, y_pred, classes, fname, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues):
-    """
-    This function prints and plots the confusion matrix.
-    Normalization can be applied by setting `normalize=True`.
-    """
-    if normalize:
-        cm = confusion_matrix(y_true, y_pred, normalize='true')
-    else:
-        cm = confusion_matrix(y_true, y_pred)
+def SaveConfusionMatrix(y_true, y_pred, classes, fname, normalize=True, title='Confusion matrix', cmap=plt.cm.Blues):
+  """
+  This function prints and plots the confusion matrix.
+  Normalization can be applied by setting `normalize=True`.
+  """
+  if normalize:
+    cm = confusion_matrix(y_true, y_pred, normalize='true')
+    fmt = '.2f'
+  else:
+    cm = confusion_matrix(y_true, y_pred)
+    fmt = 'd'
 
-    plt.figure(figsize=(10, 7))
-    sns.heatmap(cm, annot=True, fmt='.2f' if normalize else 'd', cmap=cmap, xticklabels=classes, yticklabels=classes)
-    plt.title(title)
-    plt.xlabel('Predicted label')
-    plt.ylabel('True label')
-    plt.savefig(fname, dpi=480)
-    plt.close()
+  plt.figure(figsize=(12, 10))
+  ax = sns.heatmap(
+    cm,
+    annot=True,
+    fmt=fmt,
+    cmap=cmap,
+    xticklabels=classes,
+    yticklabels=classes,
+    annot_kws={"size": 28},
+    cbar_kws={"shrink": 0.8},
+    cbar=True,
+  )
+  # Increase colorbar tick label font size
+  cbar = ax.collections[0].colorbar
+  cbar.ax.tick_params(labelsize=24)
+
+  plt.title(title, fontsize=32, pad=20)
+  plt.xlabel('Predicted label', fontsize=30, labelpad=15)
+  plt.ylabel('True label', fontsize=30, labelpad=15)
+  plt.xticks(fontsize=26, rotation=0)
+  plt.yticks(fontsize=26, rotation=90)
+  plt.title('Confusion Matrix', fontsize=24)
+  plt.tight_layout()
+  plt.savefig(fname, dpi=480)
+  plt.close()
 
 #########################################################
 def FitKerasModel(data, val_data, dataname="", verbose=True):

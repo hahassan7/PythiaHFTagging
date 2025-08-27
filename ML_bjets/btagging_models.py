@@ -269,7 +269,7 @@ def FitKerasModel(data, val_data, dataname="", verbose=True):
   myModel.PrintProperties()
 
   ### Train model
-  myModel.TrainModel(X_train, y_train, X_test, y_test, numEpochs = 10)
+  myModel.TrainModel(X_train, y_train, X_test, y_test, numEpochs = 300)
   myModel.SaveModel()
 
 

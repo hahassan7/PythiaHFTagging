@@ -22,4 +22,6 @@ python3 --version
 
 # echo $dataname $nJets $minpt $maxpt
 
+python3 -c "import tensorflow as tf; print(\"GPU available\" if tf.config.list_physical_devices('GPU') else \"GPU not available\")"
+
 python3 btagging.py $dataname $nJets $minpt $maxpt

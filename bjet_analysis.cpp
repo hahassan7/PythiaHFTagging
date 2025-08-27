@@ -214,9 +214,12 @@ public:
         logLocal(DebugLevel::DEBUG, "Enabled vertex spread");
 
         // More reasonable vertex spread values (in mm)
-        pythia.readString("Beams:sigmaVertexX = 10"); // Back to mm (= 1 cm)
-        pythia.readString("Beams:sigmaVertexY = 10"); // Back to mm (= 1 cm)
-        pythia.readString("Beams:sigmaVertexZ = 50"); // Back to mm (= 5 cm)
+        pythia.readString("Beams:sigmaVertexX = 0.041"); // Back to mm (= 4.1e-03 cm)
+        pythia.readString("Beams:sigmaVertexY = 0.035"); // Back to mm (= 3.5e-03 cm)
+        pythia.readString("Beams:sigmaVertexZ = 47.2"); // Back to mm (= 4.33 cm)
+        pythia.readString("Beams:offsetVertexX = -0.4"); // Back to mm (= -0.04 cm)
+        pythia.readString("Beams:offsetVertexY = 0.22"); // Back to mm (= 0.022 cm)
+        pythia.readString("Beams:offsetVertexZ = 0.68"); // Back to mm (= 0.048 cm)
         logLocal(DebugLevel::DEBUG, "Set vertex spread parameters");
 
         pythia.readString("HardQCD:all = on");                           // Turn on hard QCD processes

@@ -11,7 +11,7 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=4000
-#SBATCH --array=1-10 #defines SLURM_ARRAY_TASK_ID
+#SBATCH --array=1-20 #defines SLURM_ARRAY_TASK_ID
 # If you change output/error here, please change
 # the mv command at the end of this macro
 #SBATCH --output=logs/output_%A-run%a.txt

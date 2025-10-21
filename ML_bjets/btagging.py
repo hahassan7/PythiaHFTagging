@@ -3,6 +3,7 @@ from sklearn.model_selection import train_test_split
 import btagging_helpers, btagging_models
 import pandas as pd
 import sys, os
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import tensorflow as tf
 
 #### Settings
@@ -11,21 +12,26 @@ checkData               = False
 trainModels             = True
 evalModel               = True
 predictData             = False
+nClasses                = 3
 testSize                = 0.2
 trainSize               = 0.8
 btagging_helpers.gTarget = 2 # 2 = bjets, 1 =cjets
 
 # tf.debugging.set_log_device_placement(True)
+# tf.config.set_visible_devices([], 'GPU')
 
 data_MC = pd.DataFrame()
 dataname = sys.argv[1]
 nJetsSample = int(sys.argv[2])
+outputname = sys.argv[5]
 
+if outputname == '':
+  outputname = dataname
 
 try:
     os.makedirs("Data/{}".format(dataname), exist_ok=True)
-    os.makedirs("Results/{}".format(dataname), exist_ok=True)
-    os.makedirs("Models/{}".format(dataname), exist_ok=True)
+    os.makedirs("Results/{}".format(outputname), exist_ok=True)
+    os.makedirs("Models/{}".format(outputname), exist_ok=True)
 except OSError as error:
     print(f"Error creating directory : {error}")
 
@@ -50,13 +56,19 @@ if trainModels or evalModel:
 ####### Train & evaluate the models
 if trainModels:
   # btagging_models.Fit_RandomForest(toy_train)
-  btagging_models.FitKerasModel(toy_train, toy_test, dataname)
+  if nClasses == 2:
+    btagging_models.FitKerasModel(toy_train, toy_test, outputname)
+  else:
+    btagging_models.FitKerasModelMutliClass(toy_train, toy_test, outputname)
 
 minpT = float(sys.argv[3])
 maxpT = float(sys.argv[4])
 
 if evalModel:
-  btagging_models.EvaluateModelPerformance('Keras_Default', toy_test, dataname, minpT, maxpT)
+  if nClasses == 2:
+    btagging_models.EvaluateModelPerformance('Keras_Default', toy_test, outputname, minpT, maxpT)
+  else:
+    btagging_models.EvaluateModelPerformanceMultiClass('Keras_Default', toy_test, outputname, minpT, maxpT)
   # btagging_models.EvaluateModelPerformance('RandomForest', toy_test)
 
 
@@ -71,5 +83,5 @@ if evalModel:
 
 if predictData:
   models = ['Keras_Default']
-  # btagging_helpers.AddScoresToFiles_MC(models, 1)
-  btagging_helpers.AddScoresToFiles(models, 1)
+  # btagging_helpers.AddScoresToFiles_MC(models, dataname, outputname)
+  btagging_helpers.AddScoresToFiles(models, dataname, outputname)

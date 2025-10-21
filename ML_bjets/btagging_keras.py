@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.layers import concatenate, LSTM, Dense, Dropout, Activation, Conv1D, MaxPooling1D, Flatten, Conv2D, MaxPooling2D, SimpleRNN, ZeroPadding2D, Input
+from tensorflow.keras.layers import concatenate, LSTM, GRU, Reshape, Dense, Dropout, BatchNormalization, Activation, Conv1D, MaxPooling1D, Flatten, Conv2D, MaxPooling2D, SimpleRNN, ZeroPadding2D, Input
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.callbacks import History, EarlyStopping
 from tensorflow.keras.regularizers import l1_l2, l1, l2
@@ -50,9 +50,9 @@ class AliMLKerasModel:
     epochs = len(self.fResults.fHistoryLearningRate)
     # General information on the model
     if epochs > 0:
-      if self.fNumClasses == 2: # bin classification task
+      if self.fNumClasses >= 2: # classification task
           print('\nLoss={:4.3f}, Acc={:4.3f}, AUC={:4.3f} after {:3d} epochs (lr={:6.5f}). optimizer={:s}, loss function={:s}, init={:s}'.format(self.fResults.GetReachedLoss(), self.fResults.GetReachedAccuracy(), self.fResults.GetReachedAUC(), epochs, self.fResults.fHistoryLearningRate[epochs-1], self.fOptimizer, self.fLossFunction, self.fInit))
-      else: # classification task/regression task
+      else: # regression task
           print('\nLoss={:4.3f} after {:3d} epochs (lr={:6.5f}). optimizer={:s}, loss function={:s}, init={:s}'.format(self.fResults.GetReachedLoss(), epochs, self.fResults.fHistoryLearningRate[epochs-1], self.fOptimizer, self.fLossFunction, self.fInit))
 
     print('\n###########################\nUsing {:s}. Model branches:'.format(self.fModelName))
@@ -67,7 +67,7 @@ class AliMLKerasModel:
     elif numClasses == 2: # bin classification task
       return Dense(1, activation='sigmoid', kernel_initializer='he_normal')
     elif numClasses > 2: # classification task
-      return Dense(numClasses, activation='sigmoid', kernel_initializer='he_normal')
+      return Dense(numClasses, activation='softmax', kernel_initializer='he_normal')
 
   ###############################################
   def GetResultsObject(self, numClasses, name):
@@ -76,9 +76,75 @@ class AliMLKerasModel:
     elif numClasses == 2:
       results = AliMLModelResultsBinClassifier(name)
     elif numClasses > 2:
-      results = AliMLModelResultsMultiClassifier(name, numClasses)
+      results = AliMLModelResultsMultiClassifier(name, 2) # 2 is the label for b-jets
 
     return results
+
+  ###############################################
+  def CreateModelwBatchNorm(self, mname):
+    if self.fModel:
+      raise ValueError('Model already exists. Create a new one instead.')
+
+    if not len(self.fTempModelBranches):
+      raise ValueError('No branches given. Add some branches.')
+
+    self.fModelName = mname
+
+    # Merge the model branches to one model
+    if len(self.fTempModelBranches) > 1:
+      modelOutput = concatenate([self.fTempModelBranches[i] for i in range(len(self.fTempModelBranches))], name='ConcatenateLayer')
+      modelOutput = BatchNormalization(name='Concatenate_BatchNorm')(modelOutput)  # Apply BN after concatenation
+    else:
+      modelOutput = self.fTempModelBranches[0]
+
+    # Define regularization type
+    if self.fFinalLayerRegularization == 'elasticnet':
+      regul = l1_l2(0.001)
+    elif self.fFinalLayerRegularization == 'ridge':
+      regul = l2(0.001)
+    elif self.fFinalLayerRegularization == 'lasso':
+      regul = l1(0.001)
+    else:
+      raise ValueError('Regularization mode {:s} not recognized'.format(self.fFinalLayerRegularization))
+
+    # Add final dense layers with Batch Normalization
+    if self.fFinalLayerStructure == []:
+      for i in range(self.fFinalLayerNumLayers):
+        modelOutput = Dense(self.fFinalLayerNumNeuronsPerLayer, kernel_initializer=self.fInit, 
+                            kernel_regularizer=regul, name='Final_{:d}_{:d}'.format(i, self.fFinalLayerNumNeuronsPerLayer))(modelOutput)
+        
+        modelOutput = BatchNormalization(name='Final_BatchNorm_{:d}'.format(i))(modelOutput)  # BN before activation
+        modelOutput = Activation(self.fFinalLayerActivation, name='Final_Activation_{:d}'.format(i))(modelOutput)
+
+        if self.fFinalLayerDropout:
+          modelOutput = Dropout(self.fFinalLayerDropout, name='Final_Dropout_{:d}_{:3.2f}'.format(i, self.fFinalLayerDropout))(modelOutput)
+    else:
+      for i, nNodes in enumerate(self.fFinalLayerStructure):
+        modelOutput = Dense(nNodes, kernel_initializer=self.fInit, kernel_regularizer=regul, 
+                            name='Final_{:d}_{:d}'.format(i, nNodes))(modelOutput)
+        
+        modelOutput = BatchNormalization(name='Final_BatchNorm_{:d}'.format(i))(modelOutput)  # BN before activation
+        modelOutput = Activation(self.fFinalLayerActivation, name='Final_Activation_{:d}'.format(i))(modelOutput)
+
+        if self.fFinalLayerDropout:
+          modelOutput = Dropout(self.fFinalLayerDropout, name='Final_Dropout_{:d}_{:3.2f}'.format(i, self.fFinalLayerDropout))(modelOutput)
+
+    # Add final output layer
+    modelOutput = self.GetOutputLayer(self.fNumClasses)(modelOutput)
+
+    # Create model
+    self.fModel = Model(inputs=[inBranch for inBranch in self.fTempModelBranchesInput], outputs=modelOutput)
+
+    # Compile model
+    self.fModel.compile(loss=self.fLossFunction, optimizer=self.fOptimizer, metrics=["accuracy"])
+
+    if self.fShowModelSummary:
+      self.fModel.summary()
+      plot_model(self.fModel, to_file='./Models/{:s}.png'.format(mname))
+
+    self.fResults = self.GetResultsObject(self.fNumClasses, self.fModelName)
+
+    return self.fModel
 
   ###############################################
   def CreateModel(self, mname):
@@ -135,7 +201,7 @@ class AliMLKerasModel:
     self.fResults = self.GetResultsObject(self.fNumClasses, self.fModelName)
 
     return self.fModel
-
+  
   ###############################################
   def TrainModel(self, data, truth, validationData, validationTruth, model=None, results=None, numEpochs=1):
     callbacks = []
@@ -143,7 +209,9 @@ class AliMLKerasModel:
     # Early stopping
     #callbacks.append(EarlyStopping(monitor='val_loss', patience=4))
     # Learning rate reduction on plateau
-    callbacks.append(keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=0))
+    callbacks.append(keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=0))
+
+    callbacks.append(keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=10, verbose=1, restore_best_weights=True, min_delta=0.0001))
 
     if model == None:
       model = self.fModel
@@ -152,6 +220,8 @@ class AliMLKerasModel:
       results = self.fResults
 
     callbacks.append(AliMLKerasModel_CallbackSaveModel(self.SaveModel, model, validationData, validationTruth, self.fBatchSize, results, len(data[0]), self.fPerEpochValidation))
+
+    callbacks.append(AliMLKerasModel_FreezeLayerAfterEpoch(model, layer_names=["B0_BatchNorm_Input", "B1_BatchNorm_Input_CNN1D", "B2_BatchNorm_Input_CNN1D"], freeze_after_epoch=1))
 
     ###############
     # Set learning should work for theano & tensorflow
@@ -271,22 +341,97 @@ class AliMLKerasModel:
     self.fTempModelBranches.append(model)
 
   ###############################################
+  def AddBranchCNN1DwRNN(self, seqConvFilters, seqMaxPoolings, subsampling, seqKernelSizes, dropout, inputShape, activation='relu', rnn_type='LSTM', rnn_units=64):
+    self.fRequestedData.append(inputShape)
+    branchID = len(self.fTempModelBranches)
+
+    inputLayer = Input(shape=inputShape, name='B{:d}_CNN1D'.format(branchID))
+    model = BatchNormalization(name='B{:d}_BatchNorm_Input_CNN1D'.format(branchID))(inputLayer)
+    for i in range(len(seqConvFilters)):
+        if i == 0:
+            model = Conv1D(seqConvFilters[i], seqKernelSizes[i], 
+                          kernel_initializer=self.fInit, 
+                          strides=subsampling, padding='same', 
+                          name=self.GetCompatibleName('B{:d}_CNN1D_{:d}_Kernels{}_Stride_{:d}'.format(branchID, i, seqKernelSizes, subsampling)))(model)
+        else:
+            model = Conv1D(seqConvFilters[i], seqKernelSizes[i], 
+                          kernel_initializer=self.fInit, 
+                          padding='same', 
+                          name=self.GetCompatibleName('B{:d}_CNN1D_{:d}_Kernels{}_activation'.format(branchID, i, seqKernelSizes)))(model)
+        
+        # Apply Batch Normalization
+        model = BatchNormalization(name='B{:d}_BatchNorm_{:d}'.format(branchID, i))(model)
+
+        # Apply Activation AFTER Batch Normalization
+        model = Activation(activation, name='B{:d}_Activation_{:d}'.format(branchID, i))(model)
+
+        # Optional MaxPooling
+        if seqMaxPoolings[i] > 0:
+            model = MaxPooling1D(pool_size=seqMaxPoolings[i], name='B{:d}_CNN1D_{:d}_{}'.format(branchID, i, seqMaxPoolings[i]))(model)
+
+        # Optional Dropout
+        if dropout:
+            model = Dropout(dropout, name='B{:d}_CNN1D_{:d}_{:3.2f}'.format(branchID, i, dropout))(model)
+
+    # Reshape to feed into RNN (batch_size, time_steps, features)
+    seq_length = model.shape[1]  # Time steps (from CNN output)
+    features = seqConvFilters[-1]  # Last filter size is the feature dimension
+    model = Reshape((seq_length, features), name='B{:d}_Reshape_for_RNN'.format(branchID))(model)
+
+    # Add RNN layer (LSTM or GRU)
+    if rnn_type == 'LSTM':
+        model = LSTM(rnn_units, return_sequences=False, name='B{:d}_LSTM_After_CNN1D'.format(branchID))(model)
+    elif rnn_type == 'GRU':
+        model = GRU(rnn_units, return_sequences=False, name='B{:d}_GRU_After_CNN1D'.format(branchID))(model)
+    else:
+        raise ValueError("Invalid RNN type. Choose 'LSTM' or 'GRU'.")
+
+    model = BatchNormalization(name='B{:d}_BatchNorm_After_RNN'.format(branchID))(model)
+
+    model = Dropout(dropout, name='B{:d}_RNN_Dropout_{:3.2f}'.format(branchID, dropout))(model)
+
+    self.fModelBranchesOutput.append('B{:d}_CNN1D_Output'.format(branchID))
+    self.fModelBranchesInput.append(inputLayer.name)
+    self.fTempModelBranchesInput.append(inputLayer)
+    self.fTempModelBranches.append(model)
+
+  ###############################################
   def AddBranchCNN1D(self, seqConvFilters, seqMaxPoolings, subsampling, seqKernelSizes, dropout, inputShape, activation='relu'):
     self.fRequestedData.append(inputShape)
     branchID = len(self.fTempModelBranches)
 
     inputLayer = Input(shape=inputShape, name='B{:d}_CNN1D'.format(branchID))
+    model = BatchNormalization(name='B{:d}_BatchNorm_Input_CNN1D'.format(branchID))(inputLayer)
     for i in range(len(seqConvFilters)):
-      if i==0:
-        model = Conv1D(seqConvFilters[i], seqKernelSizes[i], activation=activation, kernel_initializer=self.fInit, strides=subsampling, padding='same', name=self.GetCompatibleName('B{:d}_CNN1D_{:d}_Kernels{}_Stride_{:d}_activation_{:s}'.format(branchID, i, seqKernelSizes, subsampling, activation)))(inputLayer)
-      else:
-        model = Conv1D(seqConvFilters[i], seqKernelSizes[i], activation=activation, kernel_initializer=self.fInit, padding='same', name=self.GetCompatibleName('B{:d}_CNN1D_{:d}_Kernels{}_activation_{:s}'.format(branchID, i, seqKernelSizes, activation)))(model)
+        if i == 0:
+            model = Conv1D(seqConvFilters[i], seqKernelSizes[i], 
+                          kernel_initializer=self.fInit, 
+                          strides=subsampling, padding='same', 
+                          name=self.GetCompatibleName('B{:d}_CNN1D_{:d}_Kernels{}_Stride_{:d}'.format(branchID, i, seqKernelSizes, subsampling)))(model)
+        else:
+            model = Conv1D(seqConvFilters[i], seqKernelSizes[i], 
+                          kernel_initializer=self.fInit, 
+                          padding='same', 
+                          name=self.GetCompatibleName('B{:d}_CNN1D_{:d}_Kernels{}_activation'.format(branchID, i, seqKernelSizes)))(model)
+        
+        # Apply Batch Normalization
+        model = BatchNormalization(name='B{:d}_BatchNorm_{:d}'.format(branchID, i))(model)
 
-      if seqMaxPoolings[i] > 0:
-        model = MaxPooling1D(pool_size=seqMaxPoolings[i], name='B{:d}_CNN1D_{:d}_{}'.format(branchID, i, seqMaxPoolings[i]))(model)
-      if dropout:
-        model = Dropout(dropout, name='B{:d}_CNN1D_{:d}_{:3.2f}'.format(branchID, i, dropout))(model)
+        # Apply Activation AFTER Batch Normalization
+        model = Activation(activation, name='B{:d}_Activation_{:d}'.format(branchID, i))(model)
+
+        # Optional MaxPooling
+        if seqMaxPoolings[i] > 0:
+            model = MaxPooling1D(pool_size=seqMaxPoolings[i], name='B{:d}_CNN1D_{:d}_{}'.format(branchID, i, seqMaxPoolings[i]))(model)
+
+        # Optional Dropout
+        if dropout:
+            model = Dropout(dropout, name='B{:d}_CNN1D_{:d}_{:3.2f}'.format(branchID, i, dropout))(model)
+
+    # Flatten the output
     model = Flatten(name='B{:d}_CNN1D_Output'.format(branchID))(model)
+
+    model = BatchNormalization(name='B{:d}_BatchNorm_After_RNN'.format(branchID))(model)
 
     self.fModelBranchesOutput.append('B{:d}_CNN1D_Output'.format(branchID))
     self.fModelBranchesInput.append(inputLayer.name)
@@ -456,6 +601,23 @@ class AliMLKerasModel_EnhancedProgbarLogger(keras.callbacks.ProgbarLogger):
     logging.info('')
     keras.callbacks.ProgbarLogger.on_epoch_begin(self, epoch, logs)
 
+class AliMLKerasModel_FreezeLayerAfterEpoch(keras.callbacks.Callback):
+  def __init__(self, model, layer_names, freeze_after_epoch=1):
+    super(AliMLKerasModel_FreezeLayerAfterEpoch, self).__init__()
+    self.fModel = model
+    self.layer_names = layer_names
+    self.freeze_after_epoch = freeze_after_epoch
+
+    def on_epoch_begin(self, epoch, logs=None):
+      if epoch == self.freeze_after_epoch:
+        print(f"Freezing layers: {self.layer_names}")
+        for layer in self.fModel.layers:
+          if layer.name in self.layer_names:
+            layer.trainable = False
+
+        # Recompile with frozen layers
+        self.fModel.compile(optimizer=self.fModel.optimizer, loss=self.fModel.loss, metrics=self.fModel.metrics)
+
 #__________________________________________________________________________________________________________
 
 
@@ -567,6 +729,86 @@ class AliMLModelResultsBinClassifier(AliMLModelResultsBase):
     SavePlot('./Results/{:s}-AUC.png'.format(self.fModelName), 'AUC values', x=epochs, y=(self.fHistoryAUC,), functionlabels=('AUC',), legendloc='lower right', axislabels=('Number of evetns', 'AUC values'))
     # ROC
     SavePlot('./Results/{:s}-ROC.png'.format(self.fModelName), 'ROC curve', x=self.fCurrentROCy, y=(self.fCurrentROCx,self.fCurrentROCy), functionlabels=('(AUC={0:.3f})'.format(self.fCurrentAUC),'Guess ROC'), rangex=(0,1.1), legendloc='lower right', axislabels=('False Positive Rate', 'True Positive Rate') )
+
+#__________________________________________________________________________________________________________
+class AliMLModelResultsMultiClassifier(AliMLModelResultsBase):
+    """Model result class for binary b-jet vs rest ROC/AUC inside a multi-class setup"""
+
+    ###############################################
+    def __init__(self, name, b_class_index=2):
+        super().__init__(name)
+
+        self.b_class_index = b_class_index  # Assuming 2 = beauty
+        self.fCurrentAUC = None
+        self.fCurrentROCx = None
+        self.fCurrentROCy = None
+        self.fCurrentTestScores = None
+        self.fHistoryAccuracyTraining = []
+        self.fHistoryAccuracyValidation = []
+        self.fHistoryAUC = []  # Track AUC for b vs rest
+
+    ###############################################
+    def GetReachedAccuracy(self):
+        return self.fHistoryAccuracyValidation[-1]
+
+    def GetReachedAUC(self):
+        return self.fHistoryAUC[-1]
+
+    ###############################################
+    def AddResult(self, loss_train, loss_val, lr, numEvents, accuracy_train, accuracy_val, model, data, truth, test_batch_size):
+        """Add performance results from a model training"""
+        super().AddResult(loss_train, loss_val, lr, numEvents)
+        self.fHistoryAccuracyTraining.append(accuracy_train)
+        self.fHistoryAccuracyValidation.append(accuracy_val)
+
+        if not model:
+            raise ValueError('Cannot test a model that was not correctly created.')
+
+        self.RunTests(model, data, truth, test_batch_size)
+        self.fHistoryAUC.append(self.fCurrentAUC)
+
+        self.CreatePlots()
+
+    ###############################################
+    def RunTests(self, model, data, truth, test_batch_size):
+        """Runs b-jet vs rest ROC/AUC test"""
+        from sklearn.metrics import roc_auc_score, roc_curve
+
+        # Get predicted probabilities
+        merged_score = model.predict(data, batch_size=test_batch_size, verbose=0)
+
+        # Only focus on b-jet class (binary: b vs rest)
+        b_true = truth[:, self.b_class_index]
+        b_pred = merged_score[:, self.b_class_index]
+
+        fpr, tpr, _ = roc_curve(b_true, b_pred)
+        auc = roc_auc_score(b_true, b_pred)
+
+        print('AUC={:f}'.format(auc))
+
+        self.fCurrentROCx = fpr
+        self.fCurrentROCy = tpr
+        self.fCurrentAUC = auc
+
+    ###############################################
+    def CreatePlots(self):
+        import copy
+
+        super().CreatePlots()
+
+        epochs = range(len(self.fHistoryNumberEvents))
+
+        # Plot AUC over epochs
+        SavePlot('./Results/{:s}-bvsRest-AUC.png'.format(self.fModelName), 'b vs Rest AUC values',
+                 x=epochs, y=(self.fHistoryAUC,), functionlabels=('b vs Rest AUC',), 
+                 legendloc='lower right', axislabels=('Epoch', 'AUC'))
+
+        # Plot ROC curve for last epoch
+        SavePlot('./Results/{:s}-bvsRest-ROC.png'.format(self.fModelName), 'ROC curve (b vs Rest)',
+                 x=self.fCurrentROCx, y=(self.fCurrentROCy,),
+                 functionlabels=('AUC={:.3f}'.format(self.fCurrentAUC),),
+                 rangex=(0, 1.1), legendloc='lower right',
+                 axislabels=('False Positive Rate', 'True Positive Rate'))
 
 
 ###############################################

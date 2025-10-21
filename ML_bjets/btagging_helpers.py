@@ -29,17 +29,13 @@ def LoadInputData_MC(recreate, dataname, nJets):
         store = pd.HDFStore("./Data/{}/dataset.h5".format(dataname))
         if "MC" in store:
             print("")
-            print(
-                "### Loading input dataset ({}) from HDF5 store... ####".format("Data")
-            )
+            print("### Loading input dataset ({}) from HDF5 store... ####".format("Data"))
             data = store["MC"]
 
     # If data could not be loaded -> create the HDF5 store
     if data is None:
         print("")
-        print(
-            "#### Creating input dataset for HDF5 store... this will take some time ####"
-        )
+        print("#### Creating input dataset for HDF5 store... this will take some time ####")
 
         # Open the ROOT file and access the TTree
         file = uproot.open("Data/MergedTTree_{}.root".format(dataname))
@@ -115,7 +111,6 @@ def LoadInputData_MC(recreate, dataname, nJets):
         # Save the data to the HDF5 store
         store = pd.HDFStore("./Data/{}/dataset.h5".format(dataname))
         store.put("MC", data)
-        # store["MC"] = data
 
     print("... done")
     print("")
@@ -124,7 +119,7 @@ def LoadInputData_MC(recreate, dataname, nJets):
 
 
 #########################################################
-def LoadInputData_Data(recreate):
+def LoadInputData_Data(recreate, dataname, nJets):
 
     # Load data from HFD5 store if already created
     data = None
@@ -132,20 +127,16 @@ def LoadInputData_Data(recreate):
         store = pd.HDFStore("./dataset.h5")
         if "Data" in store:
             print("")
-            print(
-                "### Loading input dataset ({}) from HDF5 store... ####".format("Data")
-            )
+            print("### Loading input dataset ({}) from HDF5 store... ####".format("Data"))
             data = store["Data"]
 
     # If data could not be loaded -> create the HDF5 store
     if data is None:
         print("")
-        print(
-            "#### Creating input dataset for HDF5 store... this will take some time ####"
-        )
+        print("#### Creating input dataset for HDF5 store... this will take some time ####")
 
         # Open the ROOT file and access the TTree
-        file = uproot.open("Data/MergedTTree_LHC23d4_80Percent.root")
+        file = uproot.open("Data/MergedTTree_{}.root".format(dataname))
         tree = file["bjet-tree-merger/myTree"]
 
         # Define the branches you want to read
@@ -185,9 +176,11 @@ def LoadInputData_Data(recreate):
         mydf = mydf.apply(pd.Series.explode)
 
         # Select 1000 rows from each DataFrame
-        data = mydf.sample(n=1000, random_state=1) if len(mydf) >= 1000 else mydf
+        data = mydf.sample(n=nJets, random_state=1) if len(mydf) >= nJets else mydf
 
-        # data = mydf[:1000]
+        # Replace infinite values with NaN and then replace NaNs with zeros
+        data.replace([np.inf, -np.inf], np.nan, inplace=True)
+        data.fillna(0, inplace=True)
 
         # Save the data to the HDF5 store
         store = pd.HDFStore("./dataset.h5")
@@ -205,9 +198,9 @@ def CheckData(data, name):
     Data exploration
     """
 
-    import seaborn as sns
-
     print("Checking Data/MC")
+
+    import seaborn
 
     dataC = pd.DataFrame(data)
 
@@ -220,14 +213,14 @@ def CheckData(data, name):
     plt.clf()
 
     # correlation matrix
-    sns.heatmap(dataC.corr(), square=True, vmin=-1, vmax=1, cmap="PiYG")
+    seaborn.heatmap(dataC.corr(), square=True, vmin=-1, vmax=1, cmap="PiYG")
     plt.subplots_adjust(bottom=0.15)
     plt.subplots_adjust(left=0.10)
     plt.savefig("./Results/{}/DataCorrelation.png".format(name), dpi=120)
     plt.clf()
 
     # Pair correlations
-    sns.pairplot(
+    seaborn.pairplot(
         dataC,
         hue="jetFlavor",
         vars=[
@@ -252,18 +245,16 @@ def CheckData(data, name):
 
 
 #########################################################
-def AddScoresToFiles_MC(models, part):
+def AddScoresToFiles_MC(models, dataname, outputname):
     """Add scores to file
     Can be used in multiprocessing
     """
     import btagging_keras, btagging_models
 
-    fname = "/Users/hadi/testbjetAnalysis/ML_bjets/TEST_{}.root".format(part)
+    fname = "./Results/{}/OutputScores.root".format(outputname)
 
     # Open the ROOT file and access the TTree
-    file = uproot.open(
-        "/Users/hadi/testbjetAnalysis/MergedTTree_LHC23d4_80Percent.root"
-    )
+    file = uproot.open("Data/MergedTTree_{}.root".format(dataname))
     tree = file["bjet-tree-merger/myTree"]
 
     # Define the branches you want to read
@@ -274,7 +265,7 @@ def AddScoresToFiles_MC(models, part):
         "mNTracks",
         "mNSV",
         "mJetMass",
-        "jetFlavor",
+        "mJetFlavor",
         "mTrackpT",
         "mTrackEta",
         "mDotProdTrackJet",
@@ -323,56 +314,42 @@ def AddScoresToFiles_MC(models, part):
         if not "keras" in modelName.lower():
             import joblib
 
-            model = joblib.load(
-                "./Models/Model_{}_Target{}.pkl".format(modelName, gTarget)
-            )
+            model = joblib.load("./Models/Model_{}_Target{}.pkl".format(modelName, gTarget))
             predictions_b += [model.predict_proba(data_b)[:, 1]]
             predictions_c += [model.predict_proba(data_c)[:, 1]]
             predictions_udsg += [model.predict_proba(data_udsg)[:, 1]]
         else:
             model = btagging_keras.AliMLKerasModel(2)
-            model.LoadModel("Model_{}_Target{}".format(modelName, gTarget))
+            model.LoadModel('{}/Model_{}'.format(outputname, modelName))
             data_keras_b = btagging_models.GetDataForKeras(data_b)
             data_keras_c = btagging_models.GetDataForKeras(data_c)
             data_keras_udsg = btagging_models.GetDataForKeras(data_udsg)
-            predictions_b += [
-                model.fModel.predict(data_keras_b, batch_size=512, verbose=0)[:, 0]
-            ]
-            predictions_c += [
-                model.fModel.predict(data_keras_c, batch_size=512, verbose=0)[:, 0]
-            ]
-            predictions_udsg += [
-                model.fModel.predict(data_keras_udsg, batch_size=512, verbose=0)[:, 0]
-            ]
+            predictions_b += [model.fModel.predict(data_keras_b, batch_size=512, verbose=0)[:, 0]]
+            predictions_c += [model.fModel.predict(data_keras_c, batch_size=512, verbose=0)[:, 0]]
+            predictions_udsg += [model.fModel.predict(data_keras_udsg, batch_size=512, verbose=0)[:, 0]]
     print("... done")
 
     # Write results as new Tree to file
-    AddBranchesToTreeInFile(
-        fname, "Scores_{}".format("bJets"), models, predictions_b, overwrite=True
-    )
-    AddBranchesToTreeInFile(
-        fname, "Scores_{}".format("cJets"), models, predictions_c, overwrite=True
-    )
-    AddBranchesToTreeInFile(
-        fname, "Scores_{}".format("udsgJets"), models, predictions_udsg, overwrite=True
-    )
+    AddBranchesToTreeInFile(fname, "Scores_{}".format("bJets"), models, predictions_b, overwrite=True)
+    AddBranchesToTreeInFile(fname, "Scores_{}".format("cJets"), models, predictions_c, overwrite=True)
+    AddBranchesToTreeInFile(fname, "Scores_{}".format("udsgJets"), models, predictions_udsg, overwrite=True)
     print("... Added predictions to Trees")
 
 
 #########################################################
-def AddScoresToFiles(models, part):
+def AddScoresToFiles(models, dataname, outputname):
     """Add scores to file
     Can be used in multiprocessing
     """
     import btagging_keras, btagging_models
 
-    fname = "/home/hadi-hassan/bjetAnalysisML/ML_bjets/test_tree_score_{}.root".format(
-        part
-    )
+    fname = "./Results/{}/OutputScores.root".format(outputname)
 
     # Open the ROOT file and access the TTree
-    file = uproot.open("/home/hadi-hassan/bjetAnalysisML/test_tree.root")
+    file = uproot.open("Data/MergedTTree_{}.root".format(dataname))
+    # tree = file["myTree"]
     tree = file["bjet-tree-merger/myTree"]
+
     # Define the branches you want to read
     branches = [
         "mJetpT",
@@ -381,7 +358,7 @@ def AddScoresToFiles(models, part):
         "mNTracks",
         "mNSV",
         "mJetMass",
-        "jetFlavor",
+        "mJetFlavor",
         "mTrackpT",
         "mTrackEta",
         "mDotProdTrackJet",
@@ -421,23 +398,17 @@ def AddScoresToFiles(models, part):
         if not "keras" in modelName.lower():
             import joblib
 
-            model = joblib.load(
-                "./Models/Model_{}_Target{}.pkl".format(modelName, gTarget)
-            )
+            model = joblib.load("./Models/Model_{}_Target{}.pkl".format(modelName, gTarget))
             predictions += [model.predict_proba(data)[:, 1]]
         else:
             model = btagging_keras.AliMLKerasModel(2)
-            model.LoadModel("LHC23d4_5_20_Track2Coll/Model_{}".format(modelName))
+            model.LoadModel('{}/Model_{}'.format(outputname, modelName))
             data_keras = btagging_models.GetDataForKeras(data)
-            predictions += [
-                model.fModel.predict(data_keras, batch_size=512, verbose=0)[:, 0]
-            ]
+            predictions += [model.fModel.predict(data_keras, batch_size=512, verbose=0)[:, 0]]
     print("... done")
 
     # Write results as new Tree to file
-    AddBranchesToTreeInFile(
-        fname, "Scores_{}".format("allJets"), models, predictions, overwrite=True
-    )
+    AddBranchesToTreeInFile(fname, "Scores_{}".format("allJets"), models, predictions, overwrite=True)
     print("... Added predictions to Trees")
 
 
@@ -455,12 +426,9 @@ def AddBranchesToTreeInFile(fname, tname, bNames, bData, offset=0, overwrite=Fal
         offset = outTree.GetEntries()
 
     ##### Create branches, if they do not exist
-    outBranches = [
-        None,
-    ] * len(bNames)
-    outBuffer = [
-        None,
-    ] * len(bNames)
+    outBranches = [None, ] * len(bNames)
+    outBuffer = [None, ] * len(bNames)
+
     for i, bname in enumerate(bNames):
         outBranches[i] = outTree.GetBranch(bname)
         outBuffer[i] = np.zeros(1, dtype=float)

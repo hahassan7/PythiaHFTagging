@@ -7,14 +7,15 @@ import sys, os
 import tensorflow as tf
 
 #### Settings
-recreateData            = True
+recreateData            = False
 checkData               = False
 trainModels             = True
 evalModel               = True
 predictData             = False
 nClasses                = 3
-testSize                = 0.2
-trainSize               = 0.8
+testSize                = 0.15
+valSize                 = 0.15
+trainSize               = 0.7
 btagging_helpers.gTarget = 2 # 2 = bjets, 1 =cjets
 
 # tf.debugging.set_log_device_placement(True)
@@ -49,7 +50,10 @@ if checkData:
 
 ####### Split dataset into training and validation
 if trainModels or evalModel:
-  toy_train, toy_test = train_test_split(data_MC, test_size=testSize, train_size =trainSize, random_state=42)
+  # toy_train, toy_test = train_test_split(data_MC, test_size=testSize, train_size =trainSize, random_state=42)
+  toy_train, hold = train_test_split(data_MC, test_size=(testSize+valSize), train_size =trainSize, random_state=42)  # 70% / 30%
+  toy_val, toy_test  = train_test_split(hold,    test_size=0.50,    random_state=42)  # split 30% -> 15%/15%
+
   print('### Dataset split done. Training samples: {}, testing samples: {}'.format(len(toy_train), len(toy_test)))
 
 
@@ -57,9 +61,9 @@ if trainModels or evalModel:
 if trainModels:
   # btagging_models.Fit_RandomForest(toy_train)
   if nClasses == 2:
-    btagging_models.FitKerasModel(toy_train, toy_test, outputname)
+    btagging_models.FitKerasModel(toy_train, toy_val, outputname)
   else:
-    btagging_models.FitKerasModelMutliClass(toy_train, toy_test, outputname)
+    btagging_models.FitKerasModelMutliClass(toy_train, toy_val, outputname)
 
 minpT = float(sys.argv[3])
 maxpT = float(sys.argv[4])

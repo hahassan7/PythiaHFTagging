@@ -1,0 +1,5 @@
+logs/*
+*.o
+bjet_analysis
+ML_bjets/logs/*
+OutputFiles/Default_settings/*

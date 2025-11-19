@@ -417,13 +417,13 @@ public:
     log(mDebugLevel, DebugLevel::DEBUG, "SV input tensor created with shape: [" + std::to_string(svInputShape[0]) + ", " + std::to_string(svInputShape[1]) + ", " + std::to_string(svInputShape[2]) + "]");
 
     // Run the model
-    std::vector<const char *> inputNames = {"inputs", "inputs_1", "inputs_2"}; // Adjust based on your model's input names
+    std::vector<const char *> inputNames = {"B0_GV_In", "B1_CNN1D", "B2_CNN1D"}; // Adjust based on your model's input names
     std::vector<Ort::Value> inputTensors;                                      // Declare the vector to hold input tensors
     inputTensors.push_back(std::move(jetInputTensor));                         // Move the tensor into the vector
     inputTensors.push_back(std::move(trackInputTensor));                       // Move the tensor into the vector
     inputTensors.push_back(std::move(svInputTensor));                          // Move the tensor into the vector
 
-    std::vector<const char *> outputNames = {"output_0"}; // Adjust based on your model's output name
+    std::vector<const char *> outputNames = {"dense"}; // Adjust based on your model's output name
     log(mDebugLevel, DebugLevel::DEBUG, "Running the model...");
 
     try
@@ -433,8 +433,8 @@ public:
       log(mDebugLevel, DebugLevel::DEBUG, "Model run completed.");
 
       // Process output
-      float *outputData = outputTensors.front().GetTensorMutableData<float>();
-      std::vector<float> results(outputData, outputData + 1);
+      float *outputData = outputTensors.back().GetTensorMutableData<float>();
+      std::vector<float> results(outputData, outputData + 3);
       log(mDebugLevel, DebugLevel::DEBUG, "Output processed. Result: " + std::to_string(results.front()));
 
       return results;

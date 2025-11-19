@@ -65,6 +65,9 @@ public:
             }
         };
 
+        bool doDb = true;
+        double fC = 0.018; // fraction of b-jets for db calculation
+
         // Create output file
         TFile *outFile = new TFile("AnalysisResults.root", "RECREATE");
 
@@ -138,30 +141,39 @@ public:
 
         TH2F *hScoreVsJetPt_incl;
         TH2F *hLogScoreVsJetPt_incl;
+        TH2F *hDbScoreVsJetPt_incl;
 
         TH2F *hScoreVsJetPt_b;
         TH2F *hLogScoreVsJetPt_b;
+        TH2F *hDbScoreVsJetPt_b;
 
         TH2F *hScoreVsJetPt_c;
         TH2F *hLogScoreVsJetPt_c;
+        TH2F *hDbScoreVsJetPt_c;
 
         TH2F *hScoreVsJetPt_lf;
         TH2F *hLogScoreVsJetPt_lf;
+        TH2F *hDbScoreVsJetPt_lf;
 
         // 2D histograms for Score vs jet pT and -log(1-score) vs jet pT
         if (mTreeGen->getDoPrediction())
         {
             hScoreVsJetPt_incl = new TH2F("h2_score_jetpT", "Score vs Jet pT (inclusive);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
-            hLogScoreVsJetPt_incl = new TH2F("h2_logscore_jetpT", "-log(1-Score) vs Jet pT (inclusive);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
-
-            hScoreVsJetPt_b = new TH2F("h2_score_jetpT_bjet", "Score vs Jet pT (b-jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
-            hLogScoreVsJetPt_b = new TH2F("h2_logscore_jetpT_bjet", "-log(1-Score) vs Jet pT (b-jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
-
             hScoreVsJetPt_c = new TH2F("h2_score_jetpT_cjet", "Score vs Jet pT (c-jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
-            hLogScoreVsJetPt_c = new TH2F("h2_logscore_jetpT_cjet", "-log(1-Score) vs Jet pT (c-jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
-
+            hScoreVsJetPt_b = new TH2F("h2_score_jetpT_bjet", "Score vs Jet pT (b-jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
             hScoreVsJetPt_lf = new TH2F("h2_score_jetpT_lfjet", "Score vs Jet pT (light-flavor jets);Jet pT (GeV/c);Score", 200, 0, 200, 240, -0.1, 1.1);
-            hLogScoreVsJetPt_lf = new TH2F("h2_logscore_jetpT_lfjet", "-log(1-Score) vs Jet pT (light-flavor jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+            
+            if (doDb) {
+                hDbScoreVsJetPt_incl = new TH2F("h2_dbscore_jetpT", "Db Score vs Jet pT (inclusive);Jet pT (GeV/c);#it{D}_{b}", 200, 0, 200, 300, -10., 20.);
+                hDbScoreVsJetPt_b = new TH2F("h2_dbscore_jetpT_bjet", "Db Score vs Jet pT (b-jets);Jet pT (GeV/c);#it{D}_{b}", 200, 0, 200, 300, -10., 20.);
+                hDbScoreVsJetPt_c = new TH2F("h2_dbscore_jetpT_cjet", "Db Score vs Jet pT (c-jets);Jet pT (GeV/c);#it{D}_{b}", 200, 0, 200, 300, -10., 20.);
+                hDbScoreVsJetPt_lf = new TH2F("h2_dbscore_jetpT_lfjet", "Db Score vs Jet pT (light-flavor jets);Jet pT (GeV/c);#it{D}_{b}", 200, 0, 200, 300, -10., 20.);
+            } else {
+                hLogScoreVsJetPt_incl = new TH2F("h2_logscore_jetpT", "-log(1-Score) vs Jet pT (inclusive);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+                hLogScoreVsJetPt_b = new TH2F("h2_logscore_jetpT_bjet", "-log(1-Score) vs Jet pT (b-jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+                hLogScoreVsJetPt_c = new TH2F("h2_logscore_jetpT_cjet", "-log(1-Score) vs Jet pT (c-jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+                hLogScoreVsJetPt_lf = new TH2F("h2_logscore_jetpT_lfjet", "-log(1-Score) vs Jet pT (light-flavor jets);Jet pT (GeV/c);-log(1-Score)", 200, 0, 200, 240, 0, 30);
+            }
 
             hIPJetpTN2_ljet = new TH2D("h2IPJetpTN2_lfjet", "IP vs. Jet pT (light-flavor jets)N2;Jet pT (GeV/c);IP (cm)", 200, 0, 200, 600, -1.2, 1.2);
             hIPxyJetpTN3_ljet = new TH2D("h2IPxyJetpTN3_lfjet", "IP_{xy} vs. Jet pT (light-flavor jets)N3;Jet pT (GeV/c);IP_{xy} (cm)", 200, 0, 200, 600, -1.2, 1.2);
@@ -589,10 +601,11 @@ public:
                         {
                             auto [jetparams, trackparams, svparams] = mTreeGen->processJetFeatures(jet, allTracks, secondaryVertices, primaryVertex);
                             auto output = mTreeGen->predict(jetparams, trackparams, svparams);
-                            score = output[0];
+                            score = output[2];
 
                             // Fill the THnSparse histogram
                             double logScore = -log(1 - score);
+                            double db = std::log(output[2] / (fC * output[1] + (1 - fC) * output[0]));
                             double svMass = secondaryVertices.empty() ? 0 : secondaryVertices[0].momentum.M();
                             double svfE = secondaryVertices.empty() ? 0 : secondaryVertices[0].momentum.E() / jet.e();
                             double values[nDims] = {jet.pt(), static_cast<double>(jetFlavor), score, logScore, jet.m(), svMass, svfE};
@@ -605,12 +618,18 @@ public:
 
                             // Fill 2D histograms
                             hScoreVsJetPt_incl->Fill(jet.pt(), score);
-                            hLogScoreVsJetPt_incl->Fill(jet.pt(), logScore);
+                            if (doDb)
+                                hDbScoreVsJetPt_incl->Fill(jet.pt(), db);
+                            else
+                                hLogScoreVsJetPt_incl->Fill(jet.pt(), logScore);
 
                             if (jetFlavor == JetTaggingSpecies::beauty)
                             {
                                 hScoreVsJetPt_b->Fill(jet.pt(), score);
-                                hLogScoreVsJetPt_b->Fill(jet.pt(), logScore);
+                                if (doDb)
+                                    hDbScoreVsJetPt_b->Fill(jet.pt(), db);
+                                else
+                                    hLogScoreVsJetPt_b->Fill(jet.pt(), logScore);
 
                                 if (trackparams[1].trackpT > 0)
                                 {
@@ -631,7 +650,10 @@ public:
                             else if (jetFlavor == JetTaggingSpecies::charm)
                             {
                                 hScoreVsJetPt_c->Fill(jet.pt(), score);
-                                hLogScoreVsJetPt_c->Fill(jet.pt(), logScore);
+                                if (doDb)
+                                    hDbScoreVsJetPt_c->Fill(jet.pt(), db);
+                                else
+                                    hLogScoreVsJetPt_c->Fill(jet.pt(), logScore);
 
                                 if (trackparams[1].trackpT > 0)
                                 {
@@ -652,7 +674,10 @@ public:
                             else
                             {
                                 hScoreVsJetPt_lf->Fill(jet.pt(), score);
-                                hLogScoreVsJetPt_lf->Fill(jet.pt(), logScore);
+                                if (doDb)
+                                    hDbScoreVsJetPt_lf->Fill(jet.pt(), db);
+                                else
+                                    hLogScoreVsJetPt_lf->Fill(jet.pt(), logScore);
 
                                 if (trackparams[1].trackpT > 0)
                                 {
@@ -783,13 +808,23 @@ public:
                         hJetTaggingInfo->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     }
                     hScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hLogScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hScoreVsJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hLogScoreVsJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hScoreVsJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hLogScoreVsJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
-                    hLogScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    if (doDb)
+                    {
+                        hDbScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                        hDbScoreVsJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                        hDbScoreVsJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                        hDbScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    }
+                    else
+                    {
+                        hLogScoreVsJetPt_incl->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                        hLogScoreVsJetPt_b->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                        hLogScoreVsJetPt_c->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                        hLogScoreVsJetPt_lf->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
+                    }
                     hIPJetpTN2_ljet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hIPJetpTN2_bjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());
                     hIPJetpTN2_cjet->Scale(1.0 * pythia.info.sigmaGen() / pythia.info.nTried());

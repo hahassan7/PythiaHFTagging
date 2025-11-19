@@ -176,7 +176,7 @@ def EvaluateModelPerformanceMultiClass(model, data_in, name, minpT, maxpT):
   print('\n###### Evaluating multi-class {}'.format(model))
 
   ### Filter + split datasets
-  data = pd.DataFrame(data_in.loc[(data_in['jetpT'] >= minpT) & (data_in['jetpT'] < maxpT)])
+  data = pd.DataFrame(data_in.loc[(data_in['jetPt'] >= minpT) & (data_in['jetPt'] < maxpT)])
   data_test_B  = pd.DataFrame(data.loc[(data['jetFlavor'] == 2)])
   data_test_C  = pd.DataFrame(data.loc[(data['jetFlavor'] == 1)])
   data_test_LF = pd.DataFrame(data.loc[(data['jetFlavor'] == 0) | (data['jetFlavor'] == 3)])
@@ -424,8 +424,8 @@ def FitKerasModelMutliClass(data, val_data, dataname="", nClass = 3, verbose=Tru
   myModel.fModelBranchesOutput.append('B{:d}_GV_{:d}_{:3.2f}_Out'.format(len(myModel.fTempModelBranches), 1, 0))
   myModel.fTempModelBranches.append(inputLayer)
   
-  myModel.AddBranchCNN1DwRNN([128, 64, 64, 32], [0, 2, 2, 0], 1, [5, 3, 3, 2], 0.1, inputShape=(10, 11))
-  myModel.AddBranchCNN1DwRNN([128, 64, 64, 32], [0, 2, 2, 0], 1, [5, 3, 3, 2], 0.1, inputShape=(10, 12))
+  myModel.AddBranchCNN1DwRNN([128, 64, 64, 32], [0, 2, 2, 0], 1, [5, 3, 3, 2], 0.1, inputShape=(10, 9))
+  myModel.AddBranchCNN1DwRNN([128, 64, 64, 32], [0, 2, 2, 0], 1, [5, 3, 3, 2], 0.1, inputShape=(10, 10))
 
   myModel.SetFinalLayerVariable([256, 128, 64, 32], 0.1, 'ridge')
 

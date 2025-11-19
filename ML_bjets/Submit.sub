@@ -1,0 +1,12 @@
+executable            = RunEverything.sh
+arguments             = $(dataname) $(nJets) $(minpt) $(maxpt) $(outputname) $(ClusterID) $(ProcId)
+
+request_gpus            = 1
+requirements = regexp("A100", TARGET.GPUs_DeviceName)
+
+output                = /afs/cern.ch/work/h/hahassan/PythiaHFTagging/ML_bjets/logs/output/std.$(ClusterId).$(ProcId).out
+error                 = /afs/cern.ch/work/h/hahassan/PythiaHFTagging/ML_bjets/logs/error/std.$(ClusterId).$(ProcId).err
+log                   = /afs/cern.ch/work/h/hahassan/PythiaHFTagging/ML_bjets/logs/std.$(ClusterId).log
+
++JobFlavour = "microcentury"
+queue

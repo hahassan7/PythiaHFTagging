@@ -8,4 +8,6 @@ eval $(/cvmfs/alice.cern.ch/bin/alienv printenv VO_ALICE@O2Physics::daily-202511
 
 set -x
 
-time ./bjet_analysis -n ${NEVENTS} -pmin ${PTHATMIN} -pmax ${PTHATMAX} -ml /afs/cern.ch/work/h/hahassan/PythiaHFTagging/ML_bjets/Models/pTHardBins_TrainValTest_Split/model.onnx
+export CONFIG_SEED=$RANDOM
+time ./bjet_analysis -n ${NEVENTS} -pmin ${PTHATMIN} -pmax ${PTHATMAX} -ml /afs/cern.ch/work/h/hahassan/PythiaHFTagging/ML_bjets/Models/pTHardBins_TrainValTest_Split_Extra/model.onnx
+# time ./bjet_analysis -n ${NEVENTS} -pmin ${PTHATMIN} -pmax ${PTHATMAX}

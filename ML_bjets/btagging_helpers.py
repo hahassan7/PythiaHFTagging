@@ -26,11 +26,10 @@ def LoadInputData_MC(recreate, dataname, nJets):
     # Load data from HFD5 store if already created
     data = None
     if os.path.isfile("./Data/{}/dataset.h5".format(dataname)) and not recreate:
-        store = pd.HDFStore("./Data/{}/dataset.h5".format(dataname))
-        if "MC" in store:
-            print("")
-            print("### Loading input dataset ({}) from HDF5 store... ####".format("Data"))
-            data = store["MC"]
+        with pd.HDFStore(f"./Data/{dataname}/dataset.h5", mode="r") as store:
+            if "MC" in store:
+                print("\n### Loading input dataset (MC) from HDF5 store... ####")
+                data = store["MC"]
 
     # If data could not be loaded -> create the HDF5 store
     if data is None:
@@ -38,79 +37,83 @@ def LoadInputData_MC(recreate, dataname, nJets):
         print("#### Creating input dataset for HDF5 store... this will take some time ####")
 
         # Open the ROOT file and access the TTree
-        file = uproot.open("Data/MergedTTree_{}.root".format(dataname))
-        tree = file["jetTree"]
-        # tree = file["myTree"]
+        # file = uproot.open("Data/MergedTTree_{}.root".format(dataname))
+        with uproot.open(f"Data/MergedTTree_{dataname}.root") as file:
+            tree = file["jetTree"]
+            # tree = file["myTree"]
 
-        # Define the branches you want to read
-        branches = [
-            "jetPt",
-            "jetEta",
-            "jetPhi",
-            "nTracks",
-            "nSV",
-            "jetMass",
-            "jetFlavor",
-            "trackPt",
-            "trackEta",
-            "dotProdTrackJet",
-            "dotProdTrackJetOverJet",
-            "deltaRJetTrack",
-            "signedIP2D",
-            "signedIP3D",
-            "momFraction",
-            "deltaRTrackVertex",
-            "svPt",
-            "deltaRSVJet",
-            "svMass",
-            "svfE",
-            "svIPxy",
-            "svCPA",
-            "svChi2PCA",
-            "svDispersion",
-            "svDecayLength2D",
-            "svDecayLength3D"
-        ]
+            # Define the branches you want to read
+            branches = [
+                "jetPt",
+                "jetEta",
+                "jetPhi",
+                "nTracks",
+                "nSV",
+                "jetMass",
+                "jetFlavor",
+                "trackPt",
+                "trackEta",
+                "dotProdTrackJet",
+                "dotProdTrackJetOverJet",
+                "deltaRJetTrack",
+                "signedIP2D",
+                "signedIP3D",
+                "momFraction",
+                "deltaRTrackVertex",
+                "svPt",
+                "deltaRSVJet",
+                "svMass",
+                "svfE",
+                "svIPxy",
+                "svCPA",
+                "svChi2PCA",
+                "svDispersion",
+                "svDecayLength2D",
+                "svDecayLength3D"
+            ]
 
-        # Convert the TTree to a Pandas DataFrame
-        df = tree.arrays(branches, library="pd")
+            # Convert the TTree to a Pandas DataFrame
+            df = tree.arrays(branches, library="pd")
 
-        # Flatten the arrays for track constituents and secondary vertices
-        df = df.apply(pd.Series.explode)
+            # Flatten the arrays for track constituents and secondary vertices
+            # df = df.apply(pd.Series.explode)
+            df = df.apply(pd.Series.explode).copy(deep=True)
 
-        # Filter DataFrames based on jet flavor
-        lf_jet_df = df[(df["jetFlavor"] == 0) | (df["jetFlavor"] == 3)]
-        c_jet_df = df[df["jetFlavor"] == 1]
-        b_jet_df = df[df["jetFlavor"] == 2]
+            # >>> pT cut HERE <<<
+            df = df[df["jetPt"] < 250.0]
 
-        # Select 1000 rows from each DataFrame
-        lf_jet_sample = (
-            lf_jet_df.sample(n=int(nJets * 0.8), random_state=1)
-            if len(lf_jet_df) >= (nJets * 0.8)
-            else lf_jet_df
-        )
-        c_jet_sample = (
-            c_jet_df.sample(n=int(nJets * 0.2), random_state=1)
-            if len(c_jet_df) >= (nJets * 0.2)
-            else c_jet_df
-        )
-        b_jet_sample = (
-            b_jet_df.sample(n=nJets, random_state=1)
-            if len(b_jet_df) >= nJets
-            else b_jet_df
-        )
+            # Filter DataFrames based on jet flavor
+            lf_jet_df = df[(df["jetFlavor"] == 0) | (df["jetFlavor"] == 3)]
+            c_jet_df = df[df["jetFlavor"] == 1]
+            b_jet_df = df[df["jetFlavor"] == 2]
 
-        data = pd.concat([lf_jet_sample, c_jet_sample, b_jet_sample], copy=False)
+            # Select 1000 rows from each DataFrame
+            lf_jet_sample = (
+                lf_jet_df.sample(n=nJets, random_state=101)
+                if len(lf_jet_df) >= nJets
+                else lf_jet_df
+            )
+            c_jet_sample = (
+                c_jet_df.sample(n=nJets, random_state=202)
+                if len(c_jet_df) >= nJets
+                else c_jet_df
+            )
+            b_jet_sample = (
+                b_jet_df.sample(n=nJets, random_state=303)
+                if len(b_jet_df) >= nJets
+                else b_jet_df
+            )
+            data = pd.concat([lf_jet_sample, c_jet_sample, b_jet_sample], copy=False)
 
-        # Replace infinite values with NaN and then replace NaNs with zeros
-        data.replace([np.inf, -np.inf], np.nan, inplace=True)
-        # Initialize the missing values with zeros. The effect was distorting the performance of the model
-        data.replace([-999, 999, -99, 99], 0, inplace=True)
-        data.fillna(0, inplace=True)
+            # Replace infinite values with NaN and then replace NaNs with zeros
+            data.replace([np.inf, -np.inf], np.nan, inplace=True)
+            # Initialize the missing values with zeros. The effect was distorting the performance of the model
+            data.replace([-999, 999, -99, 99], 0, inplace=True)
+            data.fillna(0, inplace=True)
 
-        # Save the data to the HDF5 store
-        store = pd.HDFStore("./Data/{}/dataset.h5".format(dataname))
-        store.put("MC", data)
+            # Save the data to the HDF5 store
+            with pd.HDFStore(f"./Data/{dataname}/dataset.h5", mode="w") as store:
+                store.put("MC", data, format="table")
 
     print("... done")
     print("")

@@ -219,7 +219,10 @@ class AliMLKerasModel:
     if results == None:
       results = self.fResults
 
-    callbacks.append(AliMLKerasModel_CallbackSaveModel(self.SaveModel, model, validationData, validationTruth, self.fBatchSize, results, len(data[0]), self.fPerEpochValidation))
+    # callbacks.append(AliMLKerasModel_CallbackSaveModel(self.SaveModel, model, validationData, validationTruth, self.fBatchSize, results, len(data[0]), self.fPerEpochValidation))
+    callbacks.append(AliMLKerasModel_CallbackResults(model, validationData, validationTruth, self.fBatchSize, results, len(data[0]), self.fPerEpochValidation))
+
+    callbacks.append(keras.callbacks.ModelCheckpoint(filepath=f"./Models/{self.fModelName}.h5", monitor="val_accuracy", save_best_only=True, verbose=1))
 
     callbacks.append(AliMLKerasModel_FreezeLayerAfterEpoch(model, layer_names=["B0_BatchNorm_Input", "B1_BatchNorm_Input_CNN1D", "B2_BatchNorm_Input_CNN1D"], freeze_after_epoch=1))
 
@@ -249,11 +252,8 @@ class AliMLKerasModel:
       else:
         saveObj[key] = self.__dict__[key]
 
-    if sys.version_info <= (3, 12):
-      saved_model_path = "./Models/{:s}/saved_model".format(self.fModelName.split('/')[0])
-      tf.saved_model.save(self.fModel, saved_model_path)
-
-    pickle.dump(saveObj, open('./Models/{:s}.p'.format(self.fModelName), 'wb'))
+    with open('./Models/{:s}.p'.format(self.fModelName), 'wb') as file:
+      pickle.dump(saveObj, file)
 
   ###############################################
   def LoadModel(self, fname, meta_data_only=False):
@@ -271,7 +271,7 @@ class AliMLKerasModel:
     self.fModel.save_weights('./Models/{:s}.weights.h5'.format(self.fModelName), overwrite=True)
 
     # Save network architecture to file
-    jsonfile = open('./Models/{:s}.json', 'w')
+    jsonfile = open('./Models/{:s}.json'.format(self.fModelName), 'w')
     jsonfile.write(self.fModel.to_json())
     jsonfile.close()
 
@@ -374,9 +374,7 @@ class AliMLKerasModel:
             model = Dropout(dropout, name='B{:d}_CNN1D_{:d}_{:3.2f}'.format(branchID, i, dropout))(model)
 
     # Reshape to feed into RNN (batch_size, time_steps, features)
-    seq_length = model.shape[1]  # Time steps (from CNN output)
-    features = seqConvFilters[-1]  # Last filter size is the feature dimension
-    model = Reshape((seq_length, features), name='B{:d}_Reshape_for_RNN'.format(branchID))(model)
+    model = Reshape((-1, model.shape[-1]), name='B{:d}_Reshape_for_RNN'.format(branchID))(model)
 
     # Add RNN layer (LSTM or GRU)
     if rnn_type == 'LSTM':
@@ -387,8 +385,12 @@ class AliMLKerasModel:
         raise ValueError("Invalid RNN type. Choose 'LSTM' or 'GRU'.")
 
     model = BatchNormalization(name='B{:d}_BatchNorm_After_RNN'.format(branchID))(model)
+    
+    # from keras.layers import LayerNormalization
+    # model = LayerNormalization(name='B{:d}_LayerNorm_After_RNN'.format(branchID))(model)
 
-    model = Dropout(dropout, name='B{:d}_RNN_Dropout_{:3.2f}'.format(branchID, dropout))(model)
+    if dropout:
+        model = Dropout(dropout, name='B{:d}_RNN_Dropout_{:3.2f}'.format(branchID, dropout))(model)
 
     self.fModelBranchesOutput.append('B{:d}_CNN1D_Output'.format(branchID))
     self.fModelBranchesInput.append(inputLayer.name)
@@ -619,8 +621,34 @@ class AliMLKerasModel_FreezeLayerAfterEpoch(keras.callbacks.Callback):
         self.fModel.compile(optimizer=self.fModel.optimizer, loss=self.fModel.loss, metrics=self.fModel.metrics)
 
 #__________________________________________________________________________________________________________
+class AliMLKerasModel_CallbackResults(keras.callbacks.Callback):
+  def __init__(self, model, valData, valTruth, batch_size, results, nevents, dovalidation):
+    super().__init__()
+    self.fModel = model
+    self.fValidationData  = valData
+    self.fValidationTruth = valTruth
+    self.fBatchSize = batch_size
+    self.fResults = results
+    self.fNEvents = nevents
+    self.fDoValidation = dovalidation
 
+  def on_epoch_end(self, epoch, logs=None):
+    if not self.fDoValidation:
+      return
 
+    lr = K.get_value(self.fModel.optimizer.learning_rate)
+    self.fResults.AddResult(
+      logs.get('loss'),
+      logs.get('val_loss'),
+      lr,
+      self.fNEvents,
+      logs.get('acc'),
+      logs.get('val_acc'),
+      self.fModel,
+      self.fValidationData,
+      self.fValidationTruth,
+      self.fBatchSize
+    )
 
 
 class AliMLModelResultsBase:

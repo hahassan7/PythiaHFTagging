@@ -360,8 +360,8 @@ def FitKerasModel(data, val_data, dataname="", verbose=True):
   myModel.fModelBranchesOutput.append('B{:d}_GV_{:d}_{:3.2f}_Out'.format(len(myModel.fTempModelBranches), 1, 0))
   myModel.fTempModelBranches.append(inputLayer)
   
-  myModel.AddBranchCNN1DwRNN([128, 64, 64, 32], [0, 2, 2, 0], 1, [5, 3, 3, 2], 0.1, inputShape=(10, 11))
-  myModel.AddBranchCNN1DwRNN([128, 64, 64, 32], [0, 2, 2, 0], 1, [5, 3, 3, 2], 0.1, inputShape=(10, 12))
+  myModel.AddBranchCNN1DwRNN([128, 64, 64, 32], [0, 2, 2, 0], 1, [5, 3, 3, 2], 0.1, inputShape=(10, 9))
+  myModel.AddBranchCNN1DwRNN([128, 64, 64, 32], [0, 2, 2, 0], 1, [5, 3, 3, 2], 0.1, inputShape=(10, 10))
 
   myModel.SetFinalLayerVariable([256, 128, 64, 32], 0.1, 'ridge')
 
